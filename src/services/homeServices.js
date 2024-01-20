@@ -1,0 +1,91 @@
+import db from '../models/index';
+const Sequelize = require('sequelize');
+const Op = Sequelize.Op;
+
+let getDataHome = () => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            let numberCustomers = await db.User.count({
+                where: {
+                    roleId: 'R3',
+                },
+            });
+            let numberStaffs = await db.User.count({
+                where: {
+                    roleId: 'R2',
+                },
+            });
+            let numberDishs = await db.Menu.count();
+
+
+            let sales = await db.Ticket.sum('Ticket.bill', {
+                where: {
+                    payStatus: true,
+                },
+            });
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
+
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+            let arrTotalBillByStaff = await db.Ticket.findAll({
+                attributes: [
+                    'Ticket.idStaff',
+                    [db.Sequelize.fn('MAX', db.Sequelize.col('Ticket.createdAt')), 'createdAt'],
+                    [db.Sequelize.fn('COUNT', db.Sequelize.col('Ticket.id')), 'totalTicket'],
+                    [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.bill')), 'totalBill'],
+                ],
+                include: [
+                    { model: db.User, as: 'staffData', attributes: ['fullName'] },
+                ],
+                where: {
+                    payStatus: true,
+                    createdAt: {
+                        [Sequelize.Op.between]: [today, tomorrow],
+                    },
+                },
+                group: ['Ticket.idStaff', 'staffData.fullName',],
+                order: [[db.Sequelize.col('createdAt'), 'ASC']], // Sắp xếp theo chiều giảm dần của createdAt
+                raw: true,
+                nest: true,
+            })
+
+            // let arrTotalBillByStaff = await db.Ticket.findAll({
+            //     attributes: [
+            //         'idStaff',
+            //         'Ticket.createdAt',
+            //         [Sequelize.fn('SUM', Sequelize.col('Ticket.bill')), 'totalBill'],
+            //         [Sequelize.fn('COUNT', Sequelize.col('Ticket.id')), 'totalTicket'],
+            //     ],
+            //     where: {
+            //         payStatus: true,
+            //         createdAt: {
+            //             [Sequelize.Op.between]: [today, tomorrow],
+            //         },
+            //     },
+            //     include: [
+            //         { model: db.User, as: 'staffData' },
+            //     ],
+            //     group: ['idStaff', 'staffData.id', 'Ticket.createdAt'], // Sử dụng 'staffData.id' để group theo id của staffData
+            //     order: [[Sequelize.col('Ticket.createdAt'), 'ASC']], // Sắp xếp theo chiều giảm dần của createdAt
+            //     raw: true,
+            //     nest: true,
+            // });
+            resolve({
+                numberCustomers,
+                numberStaffs,
+                numberDishs,
+                sales,
+                arrTotalBillByStaff
+            });
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
+
+
+module.exports = {
+    getDataHome
+}

@@ -1,0 +1,378 @@
+import db from '../models/index';
+require('dotenv').config();
+const Sequelize = require('sequelize');
+const Op = Sequelize.Op;
+
+
+
+
+let getAllTicket = (dataInput) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const today = new Date(dataInput.date);
+            today.setHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
+
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+            let ticket = [];
+            if (dataInput.dataSearch !== 'All') {
+
+                ticket = await db.Ticket.findAll({
+                    where: {
+                        [Op.or]: [
+                            db.sequelize.literal(`CAST("Ticket"."id" AS TEXT) = '${dataInput.dataSearch}'`),
+                            { nameCustomer: { [Op.iLike]: '%' + dataInput.dataSearch + '%' } },
+                            { phoneCustomer: dataInput.dataSearch }
+                        ],
+                        createdAt: {
+                            [Sequelize.Op.between]: [today, tomorrow],
+                        },
+                    },
+                    include: [
+                        { model: db.Allcode, as: 'allCodeData', attributes: ['keyMap', 'valueEn', 'valueVi'] },
+                        { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
+                        { model: db.Schedule, as: 'scheduleData' },
+                    ],
+                    order: [[db.Sequelize.col('createdAt'), 'ASC']],
+                    raw: true,
+                    nest: true
+                });
+
+            } else {
+                ticket = await db.Ticket.findAll({
+                    include: [
+                        { model: db.Allcode, as: 'allCodeData', attributes: ['keyMap', 'valueEn', 'valueVi'] },
+                        { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
+                        { model: db.Schedule, as: 'scheduleData' },
+                        // { model: db.Table },
+                    ],
+                    where: {
+                        createdAt: {
+                            [db.Sequelize.Op.between]: [today, tomorrow],
+                        },
+                    },
+                    order: [[db.Sequelize.col('createdAt'), 'ASC']],
+                    raw: true,
+                    nest: true
+                });
+            }
+
+
+
+
+
+            await ticket.map(async (item) => {
+                let timeSlot = await db.Allcode.findOne({
+                    where: { keyMap: item.scheduleData.timeType }
+                })
+                item.timeSlot = timeSlot;
+            })
+
+
+            for (let i = 0; i < ticket.length; i++) {
+                let table = await db.Ticket.findAll({
+                    where: { id: ticket[i].id },
+                    include: [
+                        { model: db.Table },
+                    ],
+                    raw: true,
+                    nest: true
+                })
+                let tableString = '';
+                table.map(item => {
+                    tableString = tableString + ' - ' + item.Tables.tableNumber
+                })
+                ticket[i].tableString = tableString;
+            }
+
+
+            resolve(ticket);
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+
+
+let createTicket = (dataTicket) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // timeType: selectedOptionSchedule.value
+            // date: new Date(this.state.date).getTime()
+            // numberPeople: numberPeople
+            // phoneCustomer: phoneCustomer
+            // nameCustomer: nameCustomer
+            // ticketType: selectedOptionTicketClass.keyMap
+            // idStaff: userInfo.id
+            // arrIdTable: arrTableSelect
+            if (!dataTicket || !dataTicket.timeType || !dataTicket.date ||
+                !dataTicket.phoneCustomer || !dataTicket.nameCustomer ||
+                !dataTicket.numberPeople || !dataTicket.ticketType
+                || !dataTicket.idStaff || !dataTicket.arrIdTable || dataTicket.arrIdTable.length <= 0
+            ) {
+                resolve({
+                    errCode: 1,
+                    errMessage: 'Missing inputs parameter !'
+                });
+            } else {
+                let arrIdTableCheck = []
+                let arrGroupTable = [];
+                for (let i = 0; i < dataTicket.arrIdTable.length; i++) {
+                    let idTableFind = await db.Table.findOne({
+                        where: {
+                            id: dataTicket.arrIdTable[i],
+                            status: true
+                        }
+                    });
+                    if (idTableFind) {
+                        arrIdTableCheck.push(idTableFind);
+                        arrGroupTable.push(idTableFind.idGroup);
+                    }
+                }
+                let allCode = await db.Allcode.findOne({
+                    where: { keyMap: dataTicket.ticketType }
+                });
+
+                let idStaffFind = await db.User.findOne({
+                    where: {
+                        id: dataTicket.idStaff,
+                        roleId: {
+                            [db.Sequelize.Op.or]: ['R1', 'R2']
+                        },
+                        status: true
+                    }
+                });
+
+                if (!arrIdTableCheck || arrIdTableCheck.length != dataTicket.arrIdTable.length ||
+                    !idStaffFind || !allCode
+                ) {
+                    resolve({
+                        errCode: 2,
+                        errMessage: "Không tìm ra Bàn, Loại Vé hoặc Nhân viên này",
+                    });
+                } else {
+                    let price = 0;
+                    switch (dataTicket.ticketType) {
+                        case 'TI1':
+                            price = process.env.PRICE_TICKET_ADULT;
+                            break;
+                        case 'TI2':
+                            price = process.env.PRICE_TICKET_KID;
+                            break;
+                        case 'TI3':
+                            price = process.env.PRICE_TICKET_DISCOUNT;
+                            break;
+                        default:
+                            break;
+                    }
+                    let cretaeBill = price * dataTicket.numberPeople;
+
+
+                    let arrSchedule = await db.Schedule.findOne({
+                        where: {
+                            date: new Date(dataTicket.date),
+                            timeType: dataTicket.timeType,
+                            idGroup: arrGroupTable
+                        }
+                    })
+
+                    // let arrIdScheduleFind = arrSchedule.map(item => {
+                    //     return item.id
+                    // })
+                    // let ticketCreated = true;
+                    // for (let i = 0; i < arrIdScheduleFind.length; i++) {
+                    // }
+
+                    let ticket = await db.Ticket.create({
+                        idSchedule: arrSchedule.id,
+                        phoneCustomer: dataTicket.phoneCustomer,
+                        nameCustomer: dataTicket.nameCustomer,
+                        numberPeople: dataTicket.numberPeople,
+                        ticketType: dataTicket.ticketType,
+                        idStaff: dataTicket.idStaff,
+                        bill: cretaeBill
+                    })
+
+                    // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
+                    if (ticket) {
+                        await ticket.addTables(dataTicket.arrIdTable);
+                        resolve({
+                            errCode: 0,
+                            errMessage: "Create a new ticket success",
+                        });
+                    } else {
+                        resolve({
+                            errCode: 3,
+                            errMessage: "Ticket is undefined.",
+                        });
+                    }
+
+                }
+            }
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
+
+let updateTicket = (dataTicket) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            let ticket = await db.Ticket.findOne({
+                where: { id: dataTicket.id }
+            })
+            if (!ticket) {
+                resolve({
+                    errCode: 1,
+                    errMessage: `Ticket not found`
+                });
+            } else {
+                let updateTicket = await db.Ticket.update({
+                    payStatus: true
+                }, {
+                    where: { id: ticket.id }
+                });
+
+                if (!updateTicket) {
+                    resolve({
+                        errCode: 2,
+                        errMessage: 'Update the dish failed'
+                    });
+                } else {
+                    resolve({
+                        errCode: 0,
+                        errMessage: 'Update the dish success'
+                    });
+                }
+            }
+
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
+
+
+let deleteTicket = (idTicket) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!idTicket) {
+                resolve({
+                    errCode: 1,
+                    errMessage: 'Missing inputs parameter !'
+                })
+            } else {
+                let ticket = await db.Ticket.findOne({
+                    where: {
+                        id: idTicket,
+                    }
+                })
+
+                if (!ticket) {
+                    resolve({
+                        errCode: 2,
+                        errMessage: `The ticket isn't exit!`
+                    })
+                } else {
+                    if (ticket.payStatus === true) {
+                        resolve({
+                            errCode: 3,
+                            errMessage: `This ticket paied. Can't delete`
+                        })
+                    } else {
+                        // Xóa các bản ghi liên quan từ bảng trung gian
+                        await db.TicketTable.destroy({
+                            where: { ticketId: idTicket }
+                        }).then(async () => {
+                            // // Sau đó xóa Ticket
+                            await db.Ticket.destroy({
+                                where: { id: idTicket }
+                            });
+                            resolve({
+                                errCode: 0,
+                                errMessage: `Delete ticket success`
+                            })
+                        })
+                            .catch((error) => {
+                                reject(error);
+                            });
+
+
+                    }
+
+                }
+            }
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
+
+let getDataCToChart = (inputYear) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            let currentYear = new Date().getFullYear();
+            if (inputYear) {
+                currentYear = new Date(inputYear).getFullYear();
+            }
+            // let currentYear = new Date(1705597200000).getFullYear();
+            // console.log(currentYear);
+            // await db.Ticket.findAll({
+            //     attributes: [
+            //         [db.Sequelize.literal('MONTH(Ticket.createdAt)'), 'month'],
+            //         [db.Sequelize.literal('YEAR(Ticket.createdAt)'), 'year'],
+            //         [db.Sequelize.fn('SUM', db.Sequelize.col('bill')), 'total_price']
+            //     ],
+            //     where: {
+            //         payStatus: true,
+            //         [db.Sequelize.Op.and]: [
+            //             db.Sequelize.literal('YEAR(Ticket.createdAt) =  :currentYear'),
+            //         ],
+            //     },
+            //     group: [
+            //         db.Sequelize.literal('MONTH(Ticket.createdAt)'),
+            //         db.Sequelize.literal('YEAR(Ticket.createdAt)'),
+            //     ],
+            //     replacements: { currentYear },
+            //     raw: true,
+            //     nest: true
+            // })
+            await db.Ticket.findAll({
+                attributes: [
+                    [db.Sequelize.fn('EXTRACT', db.Sequelize.literal('MONTH FROM "createdAt"')), 'month'],
+                    [db.Sequelize.fn('EXTRACT', db.Sequelize.literal('YEAR FROM "createdAt"')), 'year'],
+                    [db.Sequelize.fn('SUM', db.Sequelize.col('bill')), 'total_price']
+                ],
+                where: {
+                    payStatus: true,
+                    [db.Sequelize.Op.and]: [
+                        db.Sequelize.literal('EXTRACT(YEAR FROM "createdAt") =  :currentYear'),
+                    ],
+                },
+                group: [
+                    db.Sequelize.fn('EXTRACT', db.Sequelize.literal('MONTH FROM "createdAt"')),
+                    db.Sequelize.fn('EXTRACT', db.Sequelize.literal('YEAR FROM "createdAt"')),
+                ],
+                replacements: { currentYear },
+                raw: true,
+                nest: true
+            })
+                .then(results => {
+                    resolve(results);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    reject(error);
+                });
+        } catch (error) {
+            reject(error);
+        }
+
+
+    });
+}
+
+module.exports = {
+    createTicket, getAllTicket, deleteTicket, updateTicket, getDataCToChart
+}

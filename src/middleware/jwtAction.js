@@ -41,6 +41,7 @@ const checkMiddelwareUserJWT = async (req, res, next) => {
     }
 
     let cookies = req.cookies;
+    console.log("My Cookies: ", cookies);
     if (cookies && cookies.jwt) {
         let token = cookies.jwt;
         let decoded = verifyToken(token);

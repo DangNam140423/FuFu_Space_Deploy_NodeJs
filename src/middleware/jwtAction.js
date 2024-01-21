@@ -35,15 +35,25 @@ const verifyToken = (token) => {
     return decoded;
 }
 
+const extractToken = (req) => {
+    if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
+        return req.headers.authorization.split(' ')[1];
+    }
+    return null;
+}
+
 const checkMiddelwareUserJWT = async (req, res, next) => {
     if (nonSecurePath.includes(req.path)) {
         return next();
     }
 
     let cookies = req.cookies;
-    console.log("My Cookies: ", cookies);
-    if (cookies && cookies.jwt) {
-        let token = cookies.jwt;
+    let tokenFromHeader = extractToken(req);
+    if (
+        (cookies && cookies.jwt) ||
+        tokenFromHeader
+    ) {
+        let token = cookies && cookies.jwt ? cookies.jwt : tokenFromHeader;
         let decoded = verifyToken(token);
         if (decoded) {
             let userToImage = await db.User.findOne({
@@ -63,7 +73,9 @@ const checkMiddelwareUserJWT = async (req, res, next) => {
                 errMessage: 'Not authnticated the user'
             })
         }
-    } else {
+    }
+
+    else {
         console.log("nguuuu");
         return res.status(401).json({
             errCode: -1,

@@ -74,7 +74,7 @@ let getSchedule2 = (dateInput) => {
 
 
 
-let checkPimary = (arrDataSchedule) => {
+let checkScheduleNew = (arrDataSchedule) => {
     return new Promise(async (resolve, reject) => {
         try {
             if (arrDataSchedule && arrDataSchedule.length > 0) {
@@ -82,6 +82,7 @@ let checkPimary = (arrDataSchedule) => {
                 let dataExist = await db.Schedule.findAll({
                     where: {
                         date: new Date(arrDataSchedule[0].date),
+
                     }
                 });
 
@@ -93,7 +94,7 @@ let checkPimary = (arrDataSchedule) => {
 
                 // compare difference to filter previously addded ( timeTypes, date )
                 let arrNewDataSchedule = _.differenceWith(arrDataSchedule, dataExist, (a, b) => {
-                    return a.timeType === b.timeType && a.date === b.date;
+                    return a.timeType === b.timeType && a.date === b.date && a.idGroup === b.idGroup
                 })
 
                 resolve(arrNewDataSchedule);
@@ -104,8 +105,16 @@ let checkPimary = (arrDataSchedule) => {
     })
 }
 
+
+let checkTicketOfSchedule = (arrDataSchedule) => {
+
+}
+
 let saveNewSchedule = (arrDataSchedule) => {
     return new Promise(async (resolve, reject) => {
+        // console.log(arrDataSchedule);
+        // let newArr = await checkScheduleNew(arrDataSchedule);
+        // console.log(newArr);
         try {
             if (!arrDataSchedule || arrDataSchedule < 0) {
                 resolve({
@@ -113,8 +122,6 @@ let saveNewSchedule = (arrDataSchedule) => {
                     errMessage: "Missing inputs parameter !"
                 })
             } else {
-                // let arrDataScheduleNew = await checkPimary(arrDataSchedule);
-                // Filter previously added ( timeTypes, date )
                 if (arrDataSchedule && arrDataSchedule.length > 0) {
                     await db.Schedule.destroy({
                         where: {
@@ -123,12 +130,12 @@ let saveNewSchedule = (arrDataSchedule) => {
                         }
                     })
                         .then(async () => {
-                            // console.log(`${deletedRows} rows deleted.`); // số lượng hàng đã xóa
-                            // if (arrDataSchedule.length === 1) {
-                            //     await db.Schedule.create(arrDataSchedule[0]);
-                            // } else {
                             await arrDataSchedule.map(item => {
-                                item.id = uuidv4();
+                                if (!item.id) {
+                                    item.id = uuidv4();
+                                    // tránh trường hợp id của lịch bị thay đổi
+                                    // làm cho vé có idSchedule này bị lỗi
+                                }
                                 return arrDataSchedule
                             })
                             await db.Schedule.bulkCreate(

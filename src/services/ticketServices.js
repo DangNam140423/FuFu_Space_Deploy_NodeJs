@@ -18,21 +18,23 @@ let getAllTicket = (dataInput) => {
             if (dataInput.dataSearch !== 'All') {
 
                 ticket = await db.Ticket.findAll({
+                    include: [
+                        { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
+                        { model: db.Schedule, as: 'scheduleData' },
+                    ],
                     where: {
                         [Op.or]: [
                             db.sequelize.literal(`CAST("Ticket"."id" AS TEXT) = '${dataInput.dataSearch}'`),
                             { nameCustomer: { [Op.iLike]: '%' + dataInput.dataSearch + '%' } },
                             { phoneCustomer: dataInput.dataSearch }
                         ],
-                        createdAt: {
-                            [Sequelize.Op.between]: [today, tomorrow],
+                        // createdAt: {
+                        //     [Sequelize.Op.between]: [today, tomorrow],
+                        // },
+                        '$scheduleData.date$': {
+                            [Op.between]: [today, tomorrow],
                         },
                     },
-                    include: [
-                        { model: db.Allcode, as: 'allCodeData', attributes: ['keyMap', 'valueEn', 'valueVi'] },
-                        { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
-                        { model: db.Schedule, as: 'scheduleData' },
-                    ],
                     order: [[db.Sequelize.col('createdAt'), 'ASC']],
                     raw: true,
                     nest: true
@@ -41,16 +43,20 @@ let getAllTicket = (dataInput) => {
             } else {
                 ticket = await db.Ticket.findAll({
                     include: [
-                        { model: db.Allcode, as: 'allCodeData', attributes: ['keyMap', 'valueEn', 'valueVi'] },
                         { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
                         { model: db.Schedule, as: 'scheduleData' },
                         // { model: db.Table },
                     ],
                     where: {
-                        createdAt: {
-                            [db.Sequelize.Op.between]: [today, tomorrow],
+                        '$scheduleData.date$': {
+                            [Op.between]: [today, tomorrow],
                         },
                     },
+                    // where: {
+                    //     createdAt: {
+                    //         [db.Sequelize.Op.between]: [today, tomorrow],
+                    //     },
+                    // },
                     order: [[db.Sequelize.col('createdAt'), 'ASC']],
                     raw: true,
                     nest: true
@@ -84,8 +90,6 @@ let getAllTicket = (dataInput) => {
                 })
                 ticket[i].tableString = tableString;
             }
-
-
             resolve(ticket);
         } catch (error) {
             reject(error);
@@ -98,18 +102,11 @@ let getAllTicket = (dataInput) => {
 let createTicket = (dataTicket) => {
     return new Promise(async (resolve, reject) => {
         try {
-            // timeType: selectedOptionSchedule.value
-            // date: new Date(this.state.date).getTime()
-            // numberPeople: numberPeople
-            // phoneCustomer: phoneCustomer
-            // nameCustomer: nameCustomer
-            // ticketType: selectedOptionTicketClass.keyMap
-            // idStaff: userInfo.id
-            // arrIdTable: arrTableSelect
             if (!dataTicket || !dataTicket.timeType || !dataTicket.date ||
                 !dataTicket.phoneCustomer || !dataTicket.nameCustomer ||
-                !dataTicket.numberPeople || !dataTicket.ticketType
-                || !dataTicket.idStaff || !dataTicket.arrIdTable || dataTicket.arrIdTable.length <= 0
+                // !dataTicket.numberPeople || !dataTicket.ticketType
+                !dataTicket.numberTicketType ||
+                !dataTicket.idStaff || !dataTicket.arrIdTable || dataTicket.arrIdTable.length <= 0
             ) {
                 resolve({
                     errCode: 1,
@@ -130,9 +127,9 @@ let createTicket = (dataTicket) => {
                         arrGroupTable.push(idTableFind.idGroup);
                     }
                 }
-                let allCode = await db.Allcode.findOne({
-                    where: { keyMap: dataTicket.ticketType }
-                });
+                // let allCode = await db.Allcode.findOne({
+                //     where: { keyMap: dataTicket.ticketType }
+                // });
 
                 let idStaffFind = await db.User.findOne({
                     where: {
@@ -145,28 +142,21 @@ let createTicket = (dataTicket) => {
                 });
 
                 if (!arrIdTableCheck || arrIdTableCheck.length != dataTicket.arrIdTable.length ||
-                    !idStaffFind || !allCode
+                    !idStaffFind
                 ) {
                     resolve({
                         errCode: 2,
-                        errMessage: "Không tìm ra Bàn, Loại Vé hoặc Nhân viên này",
+                        errMessage: "Không tìm ra Bàn, hoặc Nhân viên này",
                     });
                 } else {
                     let price = 0;
-                    switch (dataTicket.ticketType) {
-                        case 'TI1':
-                            price = process.env.PRICE_TICKET_ADULT;
-                            break;
-                        case 'TI2':
-                            price = process.env.PRICE_TICKET_KID;
-                            break;
-                        case 'TI3':
-                            price = process.env.PRICE_TICKET_DISCOUNT;
-                            break;
-                        default:
-                            break;
-                    }
-                    let cretaeBill = price * dataTicket.numberPeople;
+                    let numberAdult = dataTicket.numberTicketType.numberAdult;
+                    let numberKid = dataTicket.numberTicketType.numberKid;
+                    let numberDiscount = dataTicket.numberTicketType.numberDiscount;
+                    price = (numberAdult * process.env.PRICE_TICKET_ADULT)
+                        + (numberKid * process.env.PRICE_TICKET_KID)
+                        + (numberDiscount * process.env.PRICE_TICKET_DISCOUNT)
+                    let numberPeople = (numberAdult * 1 + numberKid * 1 + numberDiscount * 1)
 
 
                     let arrSchedule = await db.Schedule.findOne({
@@ -177,21 +167,26 @@ let createTicket = (dataTicket) => {
                         }
                     })
 
-                    // let arrIdScheduleFind = arrSchedule.map(item => {
-                    //     return item.id
-                    // })
-                    // let ticketCreated = true;
-                    // for (let i = 0; i < arrIdScheduleFind.length; i++) {
-                    // }
+                    let ticketType = "";
+                    if (numberAdult > 0) {
+                        ticketType = ticketType + numberAdult + " vé người lớn, "
+                    }
+                    if (numberKid > 0) {
+                        ticketType = ticketType + numberKid + " vé trẻ em, "
+                    }
+                    if (numberDiscount > 0) {
+                        ticketType = ticketType + numberDiscount + " vé discount"
+                    }
+
 
                     let ticket = await db.Ticket.create({
                         idSchedule: arrSchedule.id,
                         phoneCustomer: dataTicket.phoneCustomer,
                         nameCustomer: dataTicket.nameCustomer,
-                        numberPeople: dataTicket.numberPeople,
-                        ticketType: dataTicket.ticketType,
+                        numberPeople: numberPeople,
+                        ticketType: ticketType,
                         idStaff: dataTicket.idStaff,
-                        bill: cretaeBill
+                        bill: price
                     })
 
                     // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
@@ -207,7 +202,6 @@ let createTicket = (dataTicket) => {
                             errMessage: "Ticket is undefined.",
                         });
                     }
-
                 }
             }
         } catch (error) {

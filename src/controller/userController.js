@@ -20,7 +20,11 @@ let handleLogin = async (req, res) => {
     // set cookie
     res.cookie(
         "jwt", userData.jwtData,
-        { httpOnly: true }
+        {
+            httpOnly: true,
+            sameSite: "None",
+            secure: true
+        }
         // httpOnly: true để phía react (javascript) không thể đọc
         // và hoặc thay đổi giá trị của cookie đó, 
         // giảm thiểu rủi ro bị tấn công Cross - Site Scripting(XSS)

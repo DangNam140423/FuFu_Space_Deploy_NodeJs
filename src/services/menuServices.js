@@ -9,14 +9,24 @@ let getAllMenu = (categoryInput) => {
             let menus = [];
             if (categoryInput == 'ALL') {
                 menus = await db.Menu.findAll({
+                    attributes: {
+                        exclude: ['image']
+                    },
                     order: [
-                        ['category', 'DESC']
+                        ['category', 'DESC'],
+                        ['name', 'ASC']
                     ],
                 });
                 // menus = ['all']
             }
             if (categoryInput && categoryInput !== 'ALL') {
                 menus = await db.Menu.findAll({
+                    attributes: {
+                        exclude: ['image']
+                    },
+                    order: [
+                        ['name', 'ASC']
+                    ],
                     where: { category: categoryInput },
                 });
                 // menus = ['1', '2']
@@ -36,8 +46,12 @@ let getMenuWithPagination = (categoryInput, page, limit) => {
             let dataMenu = {};
             if (categoryInput == 'ALL') {
                 let { count, rows } = await db.Menu.findAndCountAll({
+                    attributes: {
+                        exclude: ['image']
+                    },
                     order: [
-                        ['category', 'DESC']
+                        ['category', 'DESC'],
+                        ['name', 'ASC']
                     ],
                     offset: offset,
                     limit: limit,
@@ -47,6 +61,12 @@ let getMenuWithPagination = (categoryInput, page, limit) => {
             }
             if (categoryInput && categoryInput !== 'ALL') {
                 let { count, rows } = await db.Menu.findAndCountAll({
+                    attributes: {
+                        exclude: ['image']
+                    },
+                    order: [
+                        ['name', 'ASC']
+                    ],
                     where: { category: categoryInput },
                     offset: offset,
                     limit: limit,
@@ -114,7 +134,8 @@ let createNewDish = (dataDish) => {
         try {
             if (!dataDish.name.trim() || !dataDish.category ||
                 typeof dataDish.many_sizes !== 'boolean' ||
-                !dataDish.price_L || !dataDish.image
+                !dataDish.price_L
+                // || !dataDish.image
             ) {
                 resolve({
                     errCode: 1,
@@ -139,7 +160,7 @@ let createNewDish = (dataDish) => {
                         // category cần kiểm tra chính xác nó có tồn tại trong bảng allcodes hay không 
                         // để đảm bảo tính nhất quán của dữ liệu
                         description: dataDish.description,
-                        image: dataDish.image,
+                        // image: dataDish.image,
                     });
 
                     if (createDish) {
@@ -198,13 +219,13 @@ let editDish = (dataDish) => {
                             where: { id: dish.id }
                         });
 
-                        if (dataDish.image && updateDish) {
-                            await db.Menu.update({
-                                image: dataDish.image
-                            }, {
-                                where: { id: dish.id }
-                            });
-                        }
+                        // if (dataDish.image && updateDish) {
+                        //     await db.Menu.update({
+                        //         image: dataDish.image
+                        //     }, {
+                        //         where: { id: dish.id }
+                        //     });
+                        // }
                         if (!updateDish) {
                             resolve({
                                 errCode: 4,

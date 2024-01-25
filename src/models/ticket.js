@@ -21,6 +21,8 @@ module.exports = (sequelize, DataTypes) => {
         ticketType: DataTypes.STRING,
         idStaff: DataTypes.INTEGER,
         bill: DataTypes.INTEGER,
+        dishOrder: DataTypes.STRING,
+        priceOrder: DataTypes.INTEGER,
         payStatus: DataTypes.BOOLEAN,
         createdAt: DataTypes.DATE,
     }, {

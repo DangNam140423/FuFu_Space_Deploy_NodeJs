@@ -1,6 +1,8 @@
 import db from '../models/index';
 import _ from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
+const Sequelize = require('sequelize');
+const Op = Sequelize.Op;
 
 let getSchedule = (dateInput, groupInput) => {
     return new Promise(async (resolve, reject) => {
@@ -19,6 +21,39 @@ let getSchedule = (dateInput, groupInput) => {
                 raw: true,
                 nest: true
             });
+
+
+            //  lấy arr id Schedule của ngày hôm đó mà đã tồn tại trong bảng ticket
+            // const today = new Date(dateInput);
+            // today.setUTCHours(0, 0, 0, 0);
+
+            // const tomorrow = new Date(today);
+            // tomorrow.setDate(today.getDate() + 1);
+            // const arrIdScheduleOfTicketToday = await db.Ticket.findAll({
+            //     attributes: ['idSchedule'],
+            //     include: [
+            //         { model: db.Schedule, as: 'scheduleData', attributes: ['date', 'idGroup'] },
+            //     ],
+            //     where: {
+            //         '$scheduleData.date$': {
+            //             [Op.between]: [today, tomorrow],
+            //         },
+            //         '$scheduleData.idGroup$': groupInput
+            //     },
+            //     raw: true,
+            //     nest: true
+            // })
+
+
+            // for (let i = 0; i < arrIdScheduleOfTicketToday.length; i++) {
+            //     dataSchedule.map(item => {
+            //         if (item.id === arrIdScheduleOfTicketToday[i].idSchedule) {
+            //             item.noDelete = true
+            //         }
+            //     })
+            // }
+            // console.log("Vé của ngày hôm nay và group Này: ", arrIdScheduleOfTicketToday);
+            // console.log("Lịch hôm nay: ", dataSchedule);
             resolve(dataSchedule);
         } catch (error) {
             reject(error);
@@ -33,28 +68,12 @@ let getSchedule2 = (dateInput) => {
     return new Promise(async (resolve, reject) => {
         try {
             let dataSchedule = [];
-            // dataSchedule = await db.Schedule.findAll({
-            //     where: {
-            //         date: new Date(dateInput)
-            //     },
-            //     attributes: ['id', 'date', 'timeType'],
-            //     include: [
-            //         { model: db.Allcode, as: 'allCodeData', attributes: ['valueEn', 'valueVi'] },
-            //         { model: db.Group, as: 'groupData', attributes: ['id', 'nameGroup'] },
-            //     ],
-            //     raw: true,
-            //     nest: true
-            // });
-
-
             dataSchedule = await db.Schedule.findAll({
                 where: {
                     date: new Date(dateInput)
                 },
                 attributes: [
                     [db.Sequelize.literal('DISTINCT ON ("timeType") "timeType"'), 'timeType'],
-
-                    // [Sequelize.fn('MAX', db.Sequelize.col('timeType')), 'timeType'],
                 ],
                 include: [
                     { model: db.Allcode, as: 'allCodeData', attributes: ['valueEn', 'valueVi'] },
@@ -82,7 +101,7 @@ let checkScheduleNew = (arrDataSchedule) => {
                 let dataExist = await db.Schedule.findAll({
                     where: {
                         date: new Date(arrDataSchedule[0].date),
-
+                        idGroup: arrDataSchedule[0].idGroup
                     }
                 });
 
@@ -106,8 +125,35 @@ let checkScheduleNew = (arrDataSchedule) => {
 }
 
 
-let checkTicketOfSchedule = (arrDataSchedule) => {
+let getLostSchedules = (arrDataSchedule) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (arrDataSchedule && arrDataSchedule.length > 0) {
+                // get all schedule in database
+                let dataExist = await db.Schedule.findAll({
+                    where: {
+                        date: new Date(arrDataSchedule[0].date),
+                        idGroup: arrDataSchedule[0].idGroup
+                    }
+                });
 
+                // convert date dataExist
+                dataExist = dataExist.map(item => {
+                    item.date = new Date(item.date).getTime();
+                    return item;
+                })
+
+                // compare difference to filter previously addded ( timeTypes, date, idGroup )
+                let arrLostSchedule = _.differenceWith(dataExist, arrDataSchedule, (a, b) => {
+                    return a.timeType === b.timeType && a.date === b.date && a.idGroup === b.idGroup
+                })
+
+                resolve(arrLostSchedule);
+            }
+        } catch (error) {
+            reject(error);
+        }
+    })
 }
 
 let saveNewSchedule = (arrDataSchedule) => {
@@ -123,35 +169,78 @@ let saveNewSchedule = (arrDataSchedule) => {
                 })
             } else {
                 if (arrDataSchedule && arrDataSchedule.length > 0) {
-                    await db.Schedule.destroy({
-                        where: {
-                            date: new Date(arrDataSchedule[0].date),
-                            idGroup: arrDataSchedule[0].idGroup
-                        }
-                    })
-                        .then(async () => {
-                            await arrDataSchedule.map(item => {
-                                if (!item.id) {
-                                    item.id = uuidv4();
-                                    // tránh trường hợp id của lịch bị thay đổi
-                                    // làm cho vé có idSchedule này bị lỗi
-                                }
-                                return arrDataSchedule
-                            })
-                            await db.Schedule.bulkCreate(
-                                arrDataSchedule,
-                                { individualHooks: true } // giúp thằng bulkCreate không bỏ qua trường id
-                            );
 
-                            // }
-                            resolve({
-                                errCode: 0,
-                                errMessage: "Create new schedule succeeds !"
-                            })
+                    // Bắt đầu kiểm tra xem schedule đã xóa đi có tồn tại trong bảng Ticket không,
+                    const today = new Date(arrDataSchedule[0].date);
+                    today.setUTCHours(0, 0, 0, 0);
+
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(today.getDate() + 1);
+
+                    const arrScheduleOfTicketToday = await db.Ticket.findAll({
+                        attributes: ['idSchedule'],
+                        include: [
+                            { model: db.Schedule, as: 'scheduleData', attributes: ['date', 'idGroup'] },
+                        ],
+                        where: {
+                            '$scheduleData.date$': {
+                                [Op.between]: [today, tomorrow],
+                            },
+                            '$scheduleData.idGroup$': arrDataSchedule[0].idGroup
+                        },
+                        raw: true,
+                        nest: true
+                    })
+
+                    let arrIdInTicket = await arrScheduleOfTicketToday.map(item => { return item.idSchedule });
+                    let arrLostSchedule = await getLostSchedules(arrDataSchedule);
+                    let arrIdLostSchedule = await arrLostSchedule.map(item => { return item.id })
+                    // Kiểm tra xem schedule đã xóa đi có tồn tại trong bảng Ticket không,
+                    // Nếu có thì báo lỗi
+                    // console.log("id hôm nay có trong ticket: ", arrIdInTicket);
+                    // console.log("id bị xóa hôm nay: ", arrIdLostSchedule);
+
+                    const isAnyElementInB = arrIdLostSchedule.some(valueB => arrIdInTicket.includes(valueB));
+
+                    if (isAnyElementInB) {
+                        // "Ít nhất một giá trị của B tồn tại trong A");
+                        resolve({
+                            errCode: 3,
+                            errMessage: "Không thể xóa khung giờ mà khách đã đặt !"
                         })
-                        .catch((error) => {
-                            reject(error);
-                        });
+                    } else {
+                        // "Không có giá trị nào của B tồn tại trong A");
+                        // Lúc này mới được phép cập nhật
+                        await db.Schedule.destroy({
+                            where: {
+                                date: new Date(arrDataSchedule[0].date),
+                                idGroup: arrDataSchedule[0].idGroup
+                            }
+                        })
+                            .then(async () => {
+                                await arrDataSchedule.map(item => {
+                                    if (!item.id) {
+                                        item.id = uuidv4();
+                                        // tránh trường hợp id của lịch bị thay đổi
+                                        // làm cho vé có idSchedule này bị lỗi
+                                    }
+                                    return arrDataSchedule
+                                })
+                                await db.Schedule.bulkCreate(
+                                    arrDataSchedule,
+                                    { individualHooks: true } // giúp thằng bulkCreate không bỏ qua trường id
+                                );
+
+                                // }
+                                resolve({
+                                    errCode: 0,
+                                    errMessage: "Create new schedule succeeds !"
+                                })
+                            })
+                            .catch((error) => {
+                                reject(error);
+                            });
+                    }
                 } else {
                     resolve({
                         errCode: 2,

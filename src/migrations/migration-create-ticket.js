@@ -35,6 +35,16 @@ module.exports = {
                 allowNull: true,
                 type: Sequelize.INTEGER
             },
+            dishOrder: {
+                allowNull: true,
+                type: Sequelize.STRING,
+                defaultValue: ''
+            },
+            priceOrder: {
+                allowNull: true,
+                type: Sequelize.INTEGER,
+                defaultValue: 0
+            },
             payStatus: {
                 allowNull: true,
                 defaultValue: false,

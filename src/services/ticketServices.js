@@ -10,13 +10,33 @@ let getAllTicket = (dataInput) => {
     return new Promise(async (resolve, reject) => {
         try {
             const today = new Date(dataInput.date);
-            today.setHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
+            today.setUTCHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
 
             const tomorrow = new Date(today);
             tomorrow.setDate(today.getDate() + 1);
             let ticket = [];
-            if (dataInput.dataSearch !== 'All') {
-
+            if (dataInput.dataSearch === 'All' || dataInput.dataSearch === '') {
+                ticket = await db.Ticket.findAll({
+                    include: [
+                        { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
+                        { model: db.Schedule, as: 'scheduleData' },
+                        // { model: db.Table },
+                    ],
+                    where: {
+                        '$scheduleData.date$': {
+                            [Op.between]: [today, tomorrow],
+                        },
+                    },
+                    // where: {
+                    //     createdAt: {
+                    //         [db.Sequelize.Op.between]: [today, tomorrow],
+                    //     },
+                    // },
+                    order: [[db.Sequelize.col('createdAt'), 'ASC']],
+                    raw: true,
+                    nest: true
+                });
+            } else {
                 ticket = await db.Ticket.findAll({
                     include: [
                         { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
@@ -39,32 +59,7 @@ let getAllTicket = (dataInput) => {
                     raw: true,
                     nest: true
                 });
-
-            } else {
-                ticket = await db.Ticket.findAll({
-                    include: [
-                        { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
-                        { model: db.Schedule, as: 'scheduleData' },
-                        // { model: db.Table },
-                    ],
-                    where: {
-                        '$scheduleData.date$': {
-                            [Op.between]: [today, tomorrow],
-                        },
-                    },
-                    // where: {
-                    //     createdAt: {
-                    //         [db.Sequelize.Op.between]: [today, tomorrow],
-                    //     },
-                    // },
-                    order: [[db.Sequelize.col('createdAt'), 'ASC']],
-                    raw: true,
-                    nest: true
-                });
             }
-
-
-
 
 
             await ticket.map(async (item) => {
@@ -247,6 +242,58 @@ let updateTicket = (dataTicket) => {
     })
 }
 
+let updateTicketOrder = (dataTicket, arrOrder) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            let ticket = await db.Ticket.findOne({
+                where: { id: dataTicket.id }
+            })
+            if (!ticket) {
+                resolve({
+                    errCode: 1,
+                    errMessage: `Ticket not found`
+                });
+            } else {
+                if (arrOrder <= 0) {
+                    resolve({
+                        errCode: 2,
+                        errMessage: `Count dish <= 0`
+                    });
+                } else {
+                    let dishOrder = ticket.dishOrder;
+                    let priceOrder = ticket.priceOrder;
+                    for (let i = 0; i < arrOrder.length; i++) {
+                        dishOrder = dishOrder + arrOrder[i].count + ' ' + arrOrder[i].name + ', ';
+                        priceOrder = priceOrder + arrOrder[i].count * arrOrder[i].price
+                    }
+                    console.log(ticket.id);
+                    let updateTicket = await db.Ticket.update({
+                        dishOrder: dishOrder,
+                        priceOrder: priceOrder
+                    }, {
+                        where: { id: ticket.id }
+                    });
+
+                    if (!updateTicket) {
+                        resolve({
+                            errCode: 2,
+                            errMessage: 'Update the dish failed'
+                        });
+                    } else {
+                        resolve({
+                            errCode: 0,
+                            errMessage: 'Update the dish success'
+                        });
+                    }
+                }
+            }
+
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
+
 
 let deleteTicket = (idTicket) => {
     return new Promise(async (resolve, reject) => {
@@ -336,7 +383,14 @@ let getDataCToChart = (inputYear) => {
                 attributes: [
                     [db.Sequelize.fn('EXTRACT', db.Sequelize.literal('MONTH FROM "createdAt"')), 'month'],
                     [db.Sequelize.fn('EXTRACT', db.Sequelize.literal('YEAR FROM "createdAt"')), 'year'],
-                    [db.Sequelize.fn('SUM', db.Sequelize.col('bill')), 'total_price']
+                    // [db.Sequelize.fn('SUM', db.Sequelize.col('bill')), 'total_price'],
+                    [
+                        db.Sequelize.fn(
+                            'SUM',
+                            db.Sequelize.literal('("bill" + "priceOrder")')
+                        ),
+                        'total_price',
+                    ],
                 ],
                 where: {
                     payStatus: true,
@@ -368,5 +422,5 @@ let getDataCToChart = (inputYear) => {
 }
 
 module.exports = {
-    createTicket, getAllTicket, deleteTicket, updateTicket, getDataCToChart
+    createTicket, getAllTicket, deleteTicket, updateTicket, updateTicketOrder, getDataCToChart
 }

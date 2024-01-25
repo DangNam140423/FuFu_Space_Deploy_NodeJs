@@ -18,14 +18,22 @@ let getDataHome = () => {
             let numberDishs = await db.Menu.count();
 
 
-            let sales = await db.Ticket.sum('Ticket.bill', {
+            let bill = await db.Ticket.sum('Ticket.bill', {
                 where: {
                     payStatus: true,
                 },
             });
 
+            let priceOrder = await db.Ticket.sum('Ticket.priceOrder', {
+                where: {
+                    payStatus: true,
+                },
+            });
+
+            let sales = bill * 1 + priceOrder * 1;
+
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
+            today.setUTCHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
 
             const tomorrow = new Date(today);
             tomorrow.setDate(today.getDate() + 1);
@@ -34,7 +42,14 @@ let getDataHome = () => {
                     'Ticket.idStaff',
                     [db.Sequelize.fn('MAX', db.Sequelize.col('Ticket.createdAt')), 'createdAt'],
                     [db.Sequelize.fn('COUNT', db.Sequelize.col('Ticket.id')), 'totalTicket'],
-                    [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.bill')), 'totalBill'],
+                    // [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.bill')), 'totalBill'],
+                    [
+                        db.Sequelize.fn(
+                            'SUM',
+                            db.Sequelize.literal('("bill" + "priceOrder")')
+                        ),
+                        'totalBill',
+                    ],
                 ],
                 include: [
                     { model: db.User, as: 'staffData', attributes: ['fullName'] },

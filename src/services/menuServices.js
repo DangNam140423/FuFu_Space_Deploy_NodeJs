@@ -44,7 +44,7 @@ let getMenuWithPagination = (categoryInput, page, limit) => {
             let offset = (page - 1) * limit;
             let countdataMenu = 0;
             let dataMenu = {};
-            if (categoryInput == 'ALL') {
+            if (categoryInput === 'ALL') {
                 let { count, rows } = await db.Menu.findAndCountAll({
                     attributes: {
                         exclude: ['image']

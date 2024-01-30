@@ -6,7 +6,9 @@ let getAllTable = () => {
     return new Promise(async (resolve, reject) => {
         try {
             let table = [];
-            table = await db.Table.findAll();
+            table = await db.Table.findAll({
+                order: [['id', 'ASC']],
+            });
             resolve(table);
         } catch (error) {
             reject(error);
@@ -36,24 +38,24 @@ let createTable = (dataTable) => {
                 });
             }
             // let arrTable = [];
-            // for (let i = 1; i <= 33; i++) {
+            // for (let i = 1; i <= 31; i++) {
             //     let object = {};
             //     object.id = i;
             //     object.tableNumber = i;
             //     object.maxPeople = 2;
-            //     if (i <= 3) {
+            //     if (i <= 2) {
             //         object.idGroup = 1
-            //     } else if (i > 3 && i <= 9) {
+            //     } else if (i > 2 && i <= 8) {
             //         object.idGroup = 2
-            //     } else if (i > 9 && i <= 13) {
+            //     } else if (i > 8 && i <= 14) {
             //         object.idGroup = 3
-            //     } else if (i > 13 && i <= 16) {
+            //     } else if (i > 14 && i <= 17) {
             //         object.idGroup = 4
-            //     } else if (i > 16 && i <= 22) {
+            //     } else if (i > 17 && i <= 23) {
             //         object.idGroup = 5
-            //     } else if (i > 22 && i <= 30) {
+            //     } else if (i > 23 && i <= 29) {
             //         object.idGroup = 6
-            //     } else if (i > 30 && i <= 33) {
+            //     } else if (i > 29 && i <= 31) {
             //         object.idGroup = 7
             //     }
             //     arrTable.push(object);
@@ -186,7 +188,8 @@ let getTableEmptyBySchedule = (dataSchedule) => {
             })
 
             let table = await db.Table.findAll({
-                where: { idGroup: arrIdGroup }
+                where: { idGroup: arrIdGroup },
+                order: [['id', 'ASC']]
             });
 
             if (arr_ticket_booked && arr_ticket_booked.length > 0) {

@@ -19,7 +19,7 @@ let getAllTicket = (dataInput) => {
                 ticket = await db.Ticket.findAll({
                     include: [
                         { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
-                        { model: db.Schedule, as: 'scheduleData' },
+                        { model: db.Schedule, as: 'scheduleData', attributes: ['id', 'date', 'timeType'] },
                         // { model: db.Table },
                     ],
                     where: {
@@ -40,7 +40,7 @@ let getAllTicket = (dataInput) => {
                 ticket = await db.Ticket.findAll({
                     include: [
                         { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
-                        { model: db.Schedule, as: 'scheduleData' },
+                        { model: db.Schedule, as: 'scheduleData', attributes: ['id', 'date', 'timeType'] },
                     ],
                     where: {
                         [Op.or]: [
@@ -61,14 +61,13 @@ let getAllTicket = (dataInput) => {
                 });
             }
 
-
-            await ticket.map(async (item) => {
+            for (let j = 0; j < ticket.length; j++) {
                 let timeSlot = await db.Allcode.findOne({
-                    where: { keyMap: item.scheduleData.timeType }
+                    where: { keyMap: ticket[j].scheduleData.timeType },
+                    attributes: ['valueVi', 'valueEn']
                 })
-                item.timeSlot = timeSlot;
-            })
-
+                ticket[j].timeSlot = await timeSlot;
+            }
 
             for (let i = 0; i < ticket.length; i++) {
                 let table = await db.Ticket.findAll({
@@ -80,11 +79,38 @@ let getAllTicket = (dataInput) => {
                     nest: true
                 })
                 let tableString = '';
+                let groupTable = ''
                 table.map(item => {
-                    tableString = tableString + ' - ' + item.Tables.tableNumber
+                    switch (item.Tables.idGroup) {
+                        case 1:
+                            groupTable = 'A'
+                            break;
+                        case 2:
+                            groupTable = 'B'
+                            break;
+                        case 3:
+                            groupTable = 'C'
+                            break;
+                        case 4:
+                            groupTable = 'D'
+                            break;
+                        case 5:
+                            groupTable = 'E'
+                            break;
+                        case 6:
+                            groupTable = 'F'
+                            break;
+                        case 7:
+                            groupTable = 'G'
+                            break;
+                        default:
+                            break;
+                    }
+                    tableString = tableString + ' - ' + groupTable + item.Tables.maxPeople
                 })
                 ticket[i].tableString = tableString;
             }
+
             resolve(ticket);
         } catch (error) {
             reject(error);
@@ -147,11 +173,21 @@ let createTicket = (dataTicket) => {
                     let price = 0;
                     let numberAdult = dataTicket.numberTicketType.numberAdult;
                     let numberKid = dataTicket.numberTicketType.numberKid;
+                    let numberAdultBest = dataTicket.numberTicketType.numberAdultBest;
+                    let numberKidBest = dataTicket.numberTicketType.numberKidBest;
                     let numberDiscount = dataTicket.numberTicketType.numberDiscount;
+
                     price = (numberAdult * process.env.PRICE_TICKET_ADULT)
                         + (numberKid * process.env.PRICE_TICKET_KID)
+                        + (numberAdultBest * process.env.PRICE_TICKET_ADULT_BEST)
+                        + (numberKidBest * process.env.PRICE_TICKET_KID_BEST)
                         + (numberDiscount * process.env.PRICE_TICKET_DISCOUNT)
-                    let numberPeople = (numberAdult * 1 + numberKid * 1 + numberDiscount * 1)
+
+                    let numberPeople = (
+                        numberAdult * 1 + numberKid * 1
+                        + numberAdultBest * 1 + numberKidBest * 1
+                        + numberDiscount * 1
+                    )
 
 
                     let arrSchedule = await db.Schedule.findOne({
@@ -168,6 +204,12 @@ let createTicket = (dataTicket) => {
                     }
                     if (numberKid > 0) {
                         ticketType = ticketType + numberKid + " vé trẻ em, "
+                    }
+                    if (numberAdultBest > 0) {
+                        ticketType = ticketType + numberAdultBest + " vé người lớn ( ưu đãi ), "
+                    }
+                    if (numberKidBest > 0) {
+                        ticketType = ticketType + numberKidBest + " vé trẻ em ( ưu đãi ), "
                     }
                     if (numberDiscount > 0) {
                         ticketType = ticketType + numberDiscount + " vé discount"
@@ -266,7 +308,6 @@ let updateTicketOrder = (dataTicket, arrOrder) => {
                         dishOrder = dishOrder + arrOrder[i].count + ' ' + arrOrder[i].name + ', ';
                         priceOrder = priceOrder + arrOrder[i].count * arrOrder[i].price
                     }
-                    console.log(ticket.id);
                     let updateTicket = await db.Ticket.update({
                         dishOrder: dishOrder,
                         priceOrder: priceOrder

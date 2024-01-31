@@ -3,11 +3,13 @@ import ticketServices from '../services/ticketServices';
 let handleGetAllTicket = async (req, res) => {
     try {
         let dataTicket = await ticketServices.getAllTicket(req.body);
+        let summaryTicket = await ticketServices.getSummaryTicket(req.body.date);
         if (dataTicket) {
             return res.status(200).json({
                 errCode: 0,
                 errMessage: "Get all ticket success",
-                dataTicket
+                dataTicket,
+                summaryTicket
             });
         } else {
             return res.status(200).json({

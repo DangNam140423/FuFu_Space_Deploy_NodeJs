@@ -118,6 +118,48 @@ let getAllTicket = (dataInput) => {
     });
 }
 
+let getSummaryTicket = (date) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const today = new Date(date);
+            today.setUTCHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
+
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+
+            let summaryTicket = await db.Ticket.findAll({
+                attributes: [
+                    [
+                        db.Sequelize.fn(
+                            'SUM',
+                            db.Sequelize.literal('("bill" + "priceOrder")')
+                        ),
+                        'totalRevenue',
+                    ],
+                    [db.Sequelize.fn('COUNT', db.Sequelize.col('Ticket.id')), 'totalTicket'],
+                    [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.numberPeople')), 'totalCustomer'],
+                ],
+                include: [
+                    { model: db.Schedule, as: 'scheduleData', attributes: ['date'] },
+                ],
+                where: {
+                    '$scheduleData.date$': {
+                        [Op.between]: [today, tomorrow],
+                    },
+                },
+                group: ['scheduleData.date',],
+                raw: true,
+                nest: true
+            });
+
+            resolve(summaryTicket);
+
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
 
 
 let createTicket = (dataTicket) => {
@@ -223,7 +265,8 @@ let createTicket = (dataTicket) => {
                         numberPeople: numberPeople,
                         ticketType: ticketType,
                         idStaff: dataTicket.idStaff,
-                        bill: price
+                        bill: price,
+                        payStatus: true
                     })
 
                     // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
@@ -463,5 +506,5 @@ let getDataCToChart = (inputYear) => {
 }
 
 module.exports = {
-    createTicket, getAllTicket, deleteTicket, updateTicket, updateTicketOrder, getDataCToChart
+    createTicket, getAllTicket, getSummaryTicket, deleteTicket, updateTicket, updateTicketOrder, getDataCToChart
 }

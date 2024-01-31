@@ -121,7 +121,8 @@ const checkUserPermissonJWT = (req, res, next) => {
                 case 'R2':
                     path = [
                         '/api/get-data-home',
-                        '/api/get-schedule', '/api/get-schedule2', '/api/bulk-create-schedule',
+                        '/api/get-schedule2',
+                        '/api/get-all-menu',
                         '/api/get-all-group',
                         '/api/get-all-code',
                         '/api/get-all-table', '/api/get-table-empty',

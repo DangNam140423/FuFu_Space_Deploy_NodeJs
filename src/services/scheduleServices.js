@@ -73,15 +73,27 @@ let getSchedule2 = (dateInput) => {
                     date: new Date(dateInput)
                 },
                 attributes: [
-                    [db.Sequelize.literal('DISTINCT ON ("timeType") "timeType"'), 'timeType'],
+                    [db.Sequelize.literal('DISTINCT ON ("timeType") "timeType"'), 'timeType']
                 ],
                 include: [
                     { model: db.Allcode, as: 'allCodeData', attributes: ['valueEn', 'valueVi'] },
                     { model: db.Group, as: 'groupData', attributes: ['id', 'nameGroup'] },
                 ],
+                order: [
+                    [db.sequelize.literal('"timeType"'), 'ASC'], // Sắp xếp theo timeType
+                ],
                 group: ['timeType', 'allCodeData.valueEn', 'allCodeData.valueVi', 'groupData.id', 'groupData.nameGroup'],
                 raw: true,
                 nest: true
+            });
+
+
+            dataSchedule = await dataSchedule.sort((a, b) => {
+                // Chuyển đổi "T1", "T2", ..., "T20" thành số để sắp xếp
+                const numA = parseInt(a.timeType.slice(1));
+                const numB = parseInt(b.timeType.slice(1));
+
+                return numA - numB;
             });
 
             resolve(dataSchedule);

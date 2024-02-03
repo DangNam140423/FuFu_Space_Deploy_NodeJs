@@ -198,7 +198,7 @@ let createTicket = (dataTicket) => {
                     where: {
                         id: dataTicket.idStaff,
                         roleId: {
-                            [db.Sequelize.Op.or]: ['R1', 'R2']
+                            [db.Sequelize.Op.or]: ['R0', 'R1', 'R2']
                         },
                         status: true
                     }
@@ -244,11 +244,11 @@ let createTicket = (dataTicket) => {
                     if (numberAdult > 0) {
                         ticketType = ticketType + numberAdult + " vé người lớn, "
                     }
-                    if (numberKid > 0) {
-                        ticketType = ticketType + numberKid + " vé trẻ em, "
-                    }
                     if (numberAdultBest > 0) {
                         ticketType = ticketType + numberAdultBest + " vé người lớn ( ưu đãi ), "
+                    }
+                    if (numberKid > 0) {
+                        ticketType = ticketType + numberKid + " vé trẻ em, "
                     }
                     if (numberKidBest > 0) {
                         ticketType = ticketType + numberKidBest + " vé trẻ em ( ưu đãi ), "
@@ -266,7 +266,8 @@ let createTicket = (dataTicket) => {
                         ticketType: ticketType,
                         idStaff: dataTicket.idStaff,
                         bill: price,
-                        payStatus: true
+                        payStatus: true,
+                        receiveStatus: dataTicket.receiveStatus
                     })
 
                     // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
@@ -290,10 +291,10 @@ let createTicket = (dataTicket) => {
     })
 }
 
-let updateTicket = (dataTicket) => {
+let updateTicket = (dataTicket, infoUser) => {
     return new Promise(async (resolve, reject) => {
         try {
-            let ticket = await db.Ticket.findOne({
+            const ticket = await db.Ticket.findOne({
                 where: { id: dataTicket.id }
             })
             if (!ticket) {
@@ -302,30 +303,170 @@ let updateTicket = (dataTicket) => {
                     errMessage: `Ticket not found`
                 });
             } else {
-                let updateTicket = await db.Ticket.update({
-                    payStatus: true
-                }, {
-                    where: { id: ticket.id }
-                });
+                let check = false;
+                // Lúc này có 3 type để sửa ( thông tin vé, trạng thái nhận vé, trạng thái thanh toán)
+                if (dataTicket.date && dataTicket.timeType && dataTicket.arrIdTable && dataTicket.arrIdTable.length > 0
+                    && typeof dataTicket.payStatus === 'undefined'
+                    && typeof dataTicket.receiveStatus === 'undefined') {
+                    if (infoUser.roleId === 'R0') {
+                        check = await updateInfo(dataTicket); // sửa info ticket
+                    } else {
+                        resolve({
+                            errCode: 3,
+                            errMessage: `You don't permission to access this resource ...`
+                        });
+                    }
+                } else if (!dataTicket.receiveStatus && typeof dataTicket.payStatus === 'undefined') {
+                    check = await updateReceive(dataTicket); // sửa trạng thái nhận vé
+                } else if (!dataTicket.payStatus && typeof dataTicket.receiveStatus === 'undefined') {
+                    check = await updatePayStatus(dataTicket); // sửa trạng thái thanh toán
+                } else {
+                    check = false;
+                }
 
-                if (!updateTicket) {
+                if (check) {
                     resolve({
-                        errCode: 2,
-                        errMessage: 'Update the dish failed'
+                        errCode: 0,
+                        errMessage: `Update success`
                     });
                 } else {
                     resolve({
-                        errCode: 0,
-                        errMessage: 'Update the dish success'
+                        errCode: 2,
+                        errMessage: `Update failed`
                     });
                 }
             }
-
         } catch (error) {
             reject(error);
         }
     })
 }
+
+
+let updateInfo = async (dataTicket) => {
+    try {
+        let arrGroupTable = [];
+        for (let i = 0; i < dataTicket.arrIdTable.length; i++) {
+            let idTableFind = await db.Table.findOne({
+                where: {
+                    id: dataTicket.arrIdTable[i],
+                    status: true
+                }
+            });
+            if (idTableFind) {
+                arrGroupTable.push(idTableFind.idGroup);
+            }
+        }
+
+
+        let arrSchedule = await db.Schedule.findOne({
+            where: {
+                date: new Date(dataTicket.date),
+                timeType: dataTicket.timeType,
+                idGroup: arrGroupTable
+            }
+        })
+
+        let transaction;
+        try {
+            // Bắt đầu transaction
+            transaction = await db.sequelize.transaction();
+
+            // Xóa các bản ghi liên quan từ bảng trung gian
+            await db.TicketTable.destroy({
+                where: { ticketId: dataTicket.id },
+                transaction
+            })
+            // Sửa lại thông tin vé
+            const [rowCount, [updatedTicket]] = await db.Ticket.update(
+                { idSchedule: arrSchedule.id, },
+                {
+                    where: {
+                        id: dataTicket.id,
+                    },
+                    returning: true, // Để nhận lại dòng được cập nhật
+                    transaction
+                }
+            );
+
+            // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
+            if (updatedTicket) {
+                for (let j = 0; j < dataTicket.arrIdTable.length; j++) {
+                    await db.TicketTable.create({
+                        ticketId: dataTicket.id,
+                        tableId: dataTicket.arrIdTable[j]
+                    }, { transaction });
+                }
+                // Commit transaction
+                await transaction.commit();
+
+                return true;
+            } else {
+                // Rollback transaction nếu có lỗi
+                await transaction.rollback();
+                return false;
+            }
+
+        } catch (error) {
+            console.log(error);
+            // Rollback transaction nếu có lỗi
+            if (transaction) {
+                await transaction.rollback();
+            }
+
+            return false;
+        }
+    } catch (error) {
+        console.log(error)
+        return false;
+    }
+}
+
+
+let updateReceive = async (dataTicket) => {
+    try {
+        let updateTicket = await db.Ticket.update({
+            receiveStatus: true
+        }, {
+            where: { id: dataTicket.id }
+        });
+
+        if (!updateTicket) {
+            return false;
+        } else {
+            return true;
+        }
+
+    } catch (error) {
+        console.log(error);
+        return false;
+    }
+}
+
+
+let updatePayStatus = async (dataTicket) => {
+    try {
+        let updateTicket = await db.Ticket.update({
+            payStatus: true
+        }, {
+            where: { id: dataTicket.id }
+        });
+
+        if (!updateTicket) {
+            return false;
+        } else {
+            return true;
+        }
+
+    } catch (error) {
+        console.log(error);
+        return false;
+    }
+}
+
+
+
+
 
 let updateTicketOrder = (dataTicket, arrOrder) => {
     return new Promise(async (resolve, reject) => {
@@ -400,32 +541,35 @@ let deleteTicket = (idTicket) => {
                         errMessage: `The ticket isn't exit!`
                     })
                 } else {
-                    if (ticket.payStatus === true) {
-                        resolve({
-                            errCode: 3,
-                            errMessage: `This ticket paied. Can't delete`
-                        })
-                    } else {
+                    let transaction;
+                    try {
+                        transaction = await db.sequelize.transaction();
                         // Xóa các bản ghi liên quan từ bảng trung gian
                         await db.TicketTable.destroy({
-                            where: { ticketId: idTicket }
-                        }).then(async () => {
-                            // // Sau đó xóa Ticket
-                            await db.Ticket.destroy({
-                                where: { id: idTicket }
-                            });
-                            resolve({
-                                errCode: 0,
-                                errMessage: `Delete ticket success`
-                            })
+                            where: { ticketId: idTicket },
+                            transaction
+                        });
+
+                        // Sau đó xóa Ticket
+                        await db.Ticket.destroy({
+                            where: { id: idTicket },
+                            transaction
+                        });
+
+                        await transaction.commit();
+                        resolve({
+                            errCode: 0,
+                            errMessage: `Delete ticket success`
                         })
-                            .catch((error) => {
-                                reject(error);
-                            });
 
-
+                    } catch (error) {
+                        console.log(error);
+                        // Rollback transaction nếu có lỗi
+                        if (transaction) {
+                            await transaction.rollback();
+                        }
+                        reject(error);
                     }
-
                 }
             }
         } catch (error) {

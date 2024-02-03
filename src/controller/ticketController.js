@@ -46,10 +46,11 @@ let handleUpdateTicket = async (req, res) => {
         let dataTicket = req.body.dataTicket;
         let arrOrder = req.body.arrOrder;
         let message = '';
+        const infoUser = req.user;
         if (arrOrder.length > 0) {
             message = await ticketServices.updateTicketOrder(dataTicket, arrOrder);
         } else {
-            message = await ticketServices.updateTicket(dataTicket);
+            message = await ticketServices.updateTicket(dataTicket, infoUser);
         }
         return res.status(200).json(
             message

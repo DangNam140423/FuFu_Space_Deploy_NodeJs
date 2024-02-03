@@ -29,7 +29,11 @@ const verifyToken = (token) => {
     try {
         decoded = jwt.verify(token, key);
     } catch (error) {
-        console.log(error)
+        if (error.name === 'TokenExpiredError') {
+            console.log('Token has expired');
+        } else {
+            console.log(error);
+        }
     }
 
     return decoded;
@@ -104,7 +108,7 @@ const checkUserPermissonJWT = (req, res, next) => {
             })
         } else {
             switch (role) {
-                case 'R1':
+                case 'R0':
                     path = [
                         '/api/get-data-home',
                         '/api/get-all-user', '/api/create-new-user', '/api/edit-user', '/api/delete-user',
@@ -118,6 +122,20 @@ const checkUserPermissonJWT = (req, res, next) => {
                         '/api/get-all-group'
                     ];
                     break;
+                case 'R1':
+                    path = [
+                        '/api/get-data-home',
+                        '/api/get-all-user', '/api/create-new-user', '/api/edit-user', '/api/delete-user',
+                        '/api/get-all-code',
+                        '/api/get-all-menu', '/api/create-new-dish', '/api/edit-dish', '/api/delete-dish',
+                        '/api/get-about', '/api/edit-about',
+                        '/api/get-schedule', '/api/get-schedule2', '/api/bulk-create-schedule',
+                        '/api/get-all-table', '/api/create-table', '/api/update-table', '/api/delete-table', '/api/get-table-empty',
+                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket',
+                        '/api/get-data-chart',
+                        '/api/get-all-group'
+                    ];
+                    break;
                 case 'R2':
                     path = [
                         '/api/get-data-home',
@@ -126,7 +144,7 @@ const checkUserPermissonJWT = (req, res, next) => {
                         '/api/get-all-group',
                         '/api/get-all-code',
                         '/api/get-all-table', '/api/get-table-empty',
-                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket', '/api/delete-ticket',
+                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket',
                         '/api/get-data-chart'
                     ];
                     break;

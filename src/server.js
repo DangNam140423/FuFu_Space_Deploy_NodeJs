@@ -14,7 +14,17 @@ let app = express();
 app.use(function (req, res, next) {
 
     // Website you wish to allow to connect
-    res.setHeader('Access-Control-Allow-Origin', process.env.URL_REACT);
+    const allowedOrigins = [
+        process.env.URL_REACT, // URL của ứng dụng React thứ nhất
+        process.env.URL_REACT_USER // URL của ứng dụng React thứ hai
+    ];
+    const origin = req.headers.origin;
+
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    // Kiểm tra xem nguồn gốc của yêu cầu có trong danh sách được phép hay không
+    // res.setHeader('Access-Control-Allow-Origin', process.env.URL_REACT);
 
     // Request methods you wish to allow
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');

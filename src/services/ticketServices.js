@@ -138,6 +138,10 @@ let getSummaryTicket = (date) => {
                     ],
                     [db.Sequelize.fn('COUNT', db.Sequelize.col('Ticket.id')), 'totalTicket'],
                     [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.numberPeople')), 'totalCustomer'],
+                    [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.numberAdult')), 'numberAdult'],
+                    [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.numberKid')), 'numberKid'],
+                    [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.numberAdultBest')), 'numberAdultBest'],
+                    [db.Sequelize.fn('SUM', db.Sequelize.col('Ticket.numberKidBest')), 'numberKidBest'],
                 ],
                 include: [
                     { model: db.Schedule, as: 'scheduleData', attributes: ['date'] },
@@ -245,43 +249,58 @@ let createTicket = (dataTicket) => {
                         ticketType = ticketType + numberAdult + " vé người lớn, "
                     }
                     if (numberAdultBest > 0) {
-                        ticketType = ticketType + numberAdultBest + " vé người lớn ( ưu đãi ), "
+                        ticketType = ticketType + numberAdultBest + " vé người lớn ( online ), "
                     }
                     if (numberKid > 0) {
                         ticketType = ticketType + numberKid + " vé trẻ em, "
                     }
                     if (numberKidBest > 0) {
-                        ticketType = ticketType + numberKidBest + " vé trẻ em ( ưu đãi ), "
+                        ticketType = ticketType + numberKidBest + " vé trẻ em ( online ), "
                     }
                     if (numberDiscount > 0) {
                         ticketType = ticketType + numberDiscount + " vé discount"
                     }
+                    let transaction;
+                    try {
+                        transaction = await db.sequelize.transaction();
 
+                        let ticket = await db.Ticket.create({
+                            idSchedule: arrSchedule.id,
+                            phoneCustomer: dataTicket.phoneCustomer,
+                            nameCustomer: dataTicket.nameCustomer,
+                            numberPeople: numberPeople,
+                            ticketType: ticketType,
+                            numberAdult: numberAdult,
+                            numberKid: numberKid,
+                            numberAdultBest: numberAdultBest,
+                            numberKidBest: numberKidBest,
+                            idStaff: dataTicket.idStaff,
+                            bill: price,
+                            payStatus: true,
+                            receiveStatus: dataTicket.receiveStatus
+                        }, { transaction })
 
-                    let ticket = await db.Ticket.create({
-                        idSchedule: arrSchedule.id,
-                        phoneCustomer: dataTicket.phoneCustomer,
-                        nameCustomer: dataTicket.nameCustomer,
-                        numberPeople: numberPeople,
-                        ticketType: ticketType,
-                        idStaff: dataTicket.idStaff,
-                        bill: price,
-                        payStatus: true,
-                        receiveStatus: dataTicket.receiveStatus
-                    })
+                        let ticketId = ticket.id;
 
-                    // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
-                    if (ticket) {
-                        await ticket.addTables(dataTicket.arrIdTable);
-                        resolve({
-                            errCode: 0,
-                            errMessage: "Create a new ticket success",
-                        });
-                    } else {
-                        resolve({
-                            errCode: 3,
-                            errMessage: "Ticket is undefined.",
-                        });
+                        // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
+                        if (ticket) {
+                            await ticket.addTables(dataTicket.arrIdTable, { transaction });
+                            await transaction.commit();
+                            resolve({
+                                errCode: 0,
+                                errMessage: "Create a new ticket success",
+                                ticketId
+                            });
+                        } else {
+                            await transaction.rollback(); // Rollback transaction nếu không tồn tại ticket
+                            resolve({
+                                errCode: 3,
+                                errMessage: "Ticket is undefined.",
+                            });
+                        }
+                    } catch (error) {
+                        if (transaction) await transaction.rollback();
+                        reject(error);
                     }
                 }
             }

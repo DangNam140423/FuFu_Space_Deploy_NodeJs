@@ -25,7 +25,7 @@ let getSchedule = (dateInput, groupInput) => {
 
             //  lấy arr id Schedule của ngày hôm đó mà đã tồn tại trong bảng ticket
             // const today = new Date(dateInput);
-            // today.setUTCHours(0, 0, 0, 0);
+            // today.setHours(0, 0, 0, 0);
 
             // const tomorrow = new Date(today);
             // tomorrow.setDate(today.getDate() + 1);

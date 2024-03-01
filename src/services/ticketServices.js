@@ -44,7 +44,7 @@ let getAllTicket = (dataInput) => {
                     ],
                     where: {
                         [Op.or]: [
-                            db.sequelize.literal(`CAST("Ticket"."id" AS TEXT) = '${dataInput.dataSearch}'`),
+                            db.sequelize.literal(`CAST("Ticket"."id" AS TEXT) = '${parseInt(dataInput.dataSearch.toString(), 10)}'`),
                             { nameCustomer: { [Op.iLike]: '%' + dataInput.dataSearch + '%' } },
                             { phoneCustomer: dataInput.dataSearch }
                         ],

@@ -106,9 +106,9 @@ let getAllTicket = (dataInput) => {
                         default:
                             break;
                     }
-                    tableString = tableString + ' - ' + groupTable + item.Tables.maxPeople
+                    tableString = tableString + item.Tables.maxPeople + groupTable + item.Tables.tableNumber + ', '
                 })
-                ticket[i].tableString = tableString;
+                ticket[i].tableString = tableString.slice(0, -2);
             }
 
             resolve(ticket);

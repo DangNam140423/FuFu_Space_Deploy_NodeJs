@@ -1,4 +1,7 @@
 import db from '../models/index';
+require('dotenv').config();
+const Sequelize = require('sequelize');
+const Op = Sequelize.Op;
 
 
 
@@ -151,19 +154,56 @@ let deleteTable = (idTable) => {
     })
 }
 
+let addTimeType = (timeType, number) => {
+    // Lấy phần số từ chuỗi 'T'
+    const timeNumber = parseInt(timeType.substring(1));
+    // Thực hiện phép toán cộng
+    const resultNumber = timeNumber + number;
+    // Chuyển lại số thành chuỗi 'T'
+    const resultTimeType = 'T' + resultNumber;
+    return resultTimeType;
+}
+
 
 
 let getTableEmptyBySchedule = (dataSchedule) => {
     // dataSchedule ( date, timeType)
     return new Promise(async (resolve, reject) => {
         try {
+            const today = new Date(dataSchedule.date);
+            today.setUTCHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
+
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+
+            const arrTimeType = [
+                addTimeType(dataSchedule.timeType, -1),
+                addTimeType(dataSchedule.timeType, -2),
+                dataSchedule.timeType,
+                addTimeType(dataSchedule.timeType, 1),
+                addTimeType(dataSchedule.timeType, 2)
+            ];
 
             let arrSchedule = await db.Schedule.findAll({
                 where: {
-                    date: new Date(dataSchedule.date),
+                    date: {
+                        [Op.between]: [today, tomorrow],
+                    },
+                    timeType: {
+                        [db.Sequelize.Op.in]: arrTimeType
+                    }
+                }
+            });
+
+            let arrSheduleIdGroup = await db.Schedule.findAll({
+                where: {
+                    date: {
+                        [Op.between]: [today, tomorrow],
+                    },
                     timeType: dataSchedule.timeType
                 }
-            })
+            });
+
 
             // arrSchedule (id, date, timeType, idGroup)
             let arr_ticket_booked = [];
@@ -183,7 +223,7 @@ let getTableEmptyBySchedule = (dataSchedule) => {
                 }
             }
 
-            let arrIdGroup = arrSchedule.map(item => {
+            let arrIdGroup = arrSheduleIdGroup.map(item => {
                 return item.idGroup
             })
 

@@ -174,92 +174,111 @@ let saveNewSchedule = (arrDataSchedule) => {
         // let newArr = await checkScheduleNew(arrDataSchedule);
         // console.log(newArr);
         try {
-            if (!arrDataSchedule || arrDataSchedule < 0) {
-                resolve({
-                    errCode: 1,
-                    errMessage: "Missing inputs parameter !"
-                })
-            } else {
-                if (arrDataSchedule && arrDataSchedule.length > 0) {
 
-                    // Bắt đầu kiểm tra xem schedule đã xóa đi có tồn tại trong bảng Ticket không,
-                    const today = new Date(arrDataSchedule[0].date);
-                    today.setUTCHours(0, 0, 0, 0);
+            if (arrDataSchedule && arrDataSchedule.length > 0) {
 
-                    const tomorrow = new Date(today);
-                    tomorrow.setDate(today.getDate() + 1);
+                const date = new Date(arrDataSchedule[0].date);
 
-                    const arrScheduleOfTicketToday = await db.Ticket.findAll({
-                        attributes: ['idSchedule'],
-                        include: [
-                            { model: db.Schedule, as: 'scheduleData', attributes: ['date', 'idGroup'] },
-                        ],
-                        where: {
-                            '$scheduleData.date$': {
-                                [Op.between]: [today, tomorrow],
-                            },
-                            '$scheduleData.idGroup$': arrDataSchedule[0].idGroup
+
+                var day = date.getDate();
+                var month = date.getMonth() + 1; // Lưu ý: Tháng bắt đầu từ 0 nên cần cộng thêm 1
+                var year = date.getFullYear();
+
+                // Định dạng lại ngày, tháng, năm theo định dạng mong muốn (dd/MM/YYYY)
+                var formattedDate = (day < 10 ? '0' : '') + day + '/' + (month < 10 ? '0' : '') + month + '/' + year;
+
+
+                // Bắt đầu kiểm tra xem schedule đã xóa đi có tồn tại trong bảng Ticket không,
+                const today = new Date(arrDataSchedule[0].date);
+                today.setUTCHours(0, 0, 0, 0);
+
+                const tomorrow = new Date(today);
+                tomorrow.setDate(today.getDate() + 1);
+
+                const arrScheduleOfTicketToday = await db.Ticket.findAll({
+                    attributes: ['idSchedule'],
+                    include: [
+                        { model: db.Schedule, as: 'scheduleData', attributes: ['date', 'timeType', 'idGroup'] },
+                    ],
+                    where: {
+                        '$scheduleData.date$': {
+                            [Op.between]: [today, tomorrow],
                         },
-                        raw: true,
-                        nest: true
+                        '$scheduleData.idGroup$': arrDataSchedule[0].idGroup
+                    },
+                    raw: true,
+                    nest: true
+                })
+
+                for (let s = 0; s < arrScheduleOfTicketToday.length; s++) {
+                    arrDataSchedule.map(item => {
+                        if (
+                            (arrScheduleOfTicketToday[s].scheduleData.date).getTime() === (new Date(item.date)).getTime() &&
+                            arrScheduleOfTicketToday[s].scheduleData.timeType === item.timeType &&
+                            arrScheduleOfTicketToday[s].scheduleData.idGroup === item.idGroup
+                        ) {
+                            item.id = arrScheduleOfTicketToday[s].idSchedule
+                            return item
+                        }
                     })
+                }
 
-                    let arrIdInTicket = await arrScheduleOfTicketToday.map(item => { return item.idSchedule });
-                    let arrLostSchedule = await getLostSchedules(arrDataSchedule);
-                    let arrIdLostSchedule = await arrLostSchedule.map(item => { return item.id })
-                    // Kiểm tra xem schedule đã xóa đi có tồn tại trong bảng Ticket không,
-                    // Nếu có thì báo lỗi
-                    // console.log("id hôm nay có trong ticket: ", arrIdInTicket);
-                    // console.log("id bị xóa hôm nay: ", arrIdLostSchedule);
+                let arrIdInTicket = await arrScheduleOfTicketToday.map(item => { return item.idSchedule });
+                let arrLostSchedule = await getLostSchedules(arrDataSchedule);
+                let arrIdLostSchedule = await arrLostSchedule.map(item => { return item.id })
+                // Kiểm tra xem schedule đã xóa đi có tồn tại trong bảng Ticket không,
+                // Nếu có thì báo lỗi
+                // console.log("id hôm nay có trong ticket: ", arrIdInTicket);
+                // console.log("id bị xóa hôm nay: ", arrIdLostSchedule);
 
-                    const isAnyElementInB = arrIdLostSchedule.some(valueB => arrIdInTicket.includes(valueB));
+                const isAnyElementInB = arrIdLostSchedule.some(valueB => arrIdInTicket.includes(valueB));
 
-                    if (isAnyElementInB) {
-                        // "Ít nhất một giá trị của B tồn tại trong A");
-                        resolve({
-                            errCode: 3,
-                            errMessage: "Không thể xóa khung giờ mà khách đã đặt !"
-                        })
-                    } else {
-                        // "Không có giá trị nào của B tồn tại trong A");
-                        // Lúc này mới được phép cập nhật
-                        await db.Schedule.destroy({
-                            where: {
-                                date: new Date(arrDataSchedule[0].date),
-                                idGroup: arrDataSchedule[0].idGroup
-                            }
-                        })
-                            .then(async () => {
-                                await arrDataSchedule.map(item => {
-                                    if (!item.id) {
-                                        item.id = uuidv4();
-                                        // tránh trường hợp id của lịch bị thay đổi
-                                        // làm cho vé có idSchedule này bị lỗi
-                                    }
-                                    return arrDataSchedule
-                                })
-                                await db.Schedule.bulkCreate(
-                                    arrDataSchedule,
-                                    { individualHooks: true } // giúp thằng bulkCreate không bỏ qua trường id
-                                );
-
-                                // }
-                                resolve({
-                                    errCode: 0,
-                                    errMessage: "Create new schedule succeeds !"
-                                })
-                            })
-                            .catch((error) => {
-                                reject(error);
-                            });
-                    }
-                } else {
+                if (isAnyElementInB) {
+                    // "Ít nhất một giá trị của B tồn tại trong A");
                     resolve({
                         errCode: 2,
-                        errMessage: "arrDataSchedule is empty.",
-                    });
+                        errMessage: formattedDate
+                    })
+                } else {
+                    // "Không có giá trị nào của B tồn tại trong A");
+                    // Lúc này mới được phép cập nhật
+                    await db.Schedule.destroy({
+                        where: {
+                            date: new Date(arrDataSchedule[0].date),
+                            idGroup: arrDataSchedule[0].idGroup
+                        }
+                    })
+                        .then(async () => {
+                            await arrDataSchedule.map(item => {
+                                if (!item.id) {
+                                    item.id = uuidv4();
+                                    // tránh trường hợp id của lịch bị thay đổi
+                                    // làm cho vé có idSchedule này bị lỗi
+                                }
+                                return arrDataSchedule
+                            })
+                            await db.Schedule.bulkCreate(
+                                arrDataSchedule,
+                                { individualHooks: true } // giúp thằng bulkCreate không bỏ qua trường id
+                            );
+
+                            // }
+                            resolve({
+                                errCode: 0,
+                                errMessage: "Create new schedule succeeds !"
+                            })
+                        })
+                        .catch((error) => {
+                            reject(error);
+                        });
                 }
+            } else {
+                resolve({
+                    errCode: 1,
+                    errMessage: "Missing inputs parameter !",
+                });
             }
+
         } catch (error) {
             reject(error)
         }

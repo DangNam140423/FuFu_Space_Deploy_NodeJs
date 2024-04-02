@@ -1,8 +1,16 @@
 import db from '../models/index';
 require('dotenv').config();
 const Sequelize = require('sequelize');
+import sendMailServices from './sendMailServices';
+import tableServices from './tableServices';
+import { v4 as uuidv4 } from 'uuid';
 const Op = Sequelize.Op;
-
+const fs = require('fs');
+const path = require('path');
+const moment = require('moment');
+const { Mutex } = require('async-mutex');
+// Khởi tạo một Mutex
+const mutex = new Mutex();
 
 
 
@@ -150,6 +158,7 @@ let getSummaryTicket = (date) => {
                     '$scheduleData.date$': {
                         [Op.between]: [today, tomorrow],
                     },
+                    payStatus: true,
                 },
                 group: ['scheduleData.date',],
                 raw: true,
@@ -164,10 +173,382 @@ let getSummaryTicket = (date) => {
     });
 }
 
+let buildUrlEmail = (idTicket, payToken) => {
+    let result = `${process.env.URL_REACT}/verify-ticket?payToken=${payToken}&ticketId=${idTicket}`;
+
+    return result
+}
+
+
+let buildUrlEmailCancle = (idTicket, payToken) => {
+    let result = `${process.env.URL_REACT}/verify-ticket?cancle=${true}&payToken=${payToken}&ticketId=${idTicket}`;
+
+    return result
+}
+
+let createTicketByCustomer = (dataTicket) => {
+    return new Promise(async (resolve, reject) => {
+        const release = await mutex.acquire();
+        try {
+            if (!dataTicket || !dataTicket.timeType || !dataTicket.date ||
+                !dataTicket.phoneCustomer || !dataTicket.nameCustomer || !dataTicket.email ||
+                !dataTicket.numberTicketType ||
+                !dataTicket.arrIdTable || dataTicket.arrIdTable.length <= 0 ||
+                !dataTicket.imageBill
+            ) {
+                resolve({
+                    errCode: 1,
+                    errMessage: 'Missing inputs parameter !'
+                });
+            } else {
+                // arrTable này sẽ là những ghế không thể chọn, vì đã có người chọn trước
+                let tableNotEmpty = await tableServices.getTableEmptyByScheduleToBooking({
+                    date: dataTicket.date,
+                    timeType: dataTicket.timeType
+                });
+
+                let arrIdTableCheck = []
+                let arrGroupTable = [];
+                for (let i = 0; i < dataTicket.arrIdTable.length; i++) {
+                    let idTableFind = await db.Table.findOne({
+                        where: {
+                            id: dataTicket.arrIdTable[i],
+                            status: true
+                        }
+                    });
+                    if (idTableFind) {
+                        arrIdTableCheck.push(idTableFind);
+                        arrGroupTable.push(idTableFind.idGroup);
+                    }
+                }
+
+
+                if (!arrIdTableCheck || arrIdTableCheck.length != dataTicket.arrIdTable.length
+                ) {
+                    resolve({
+                        errCode: 2,
+                        errMessage: "Không tìm ra bàn này",
+                    });
+                } else {
+                    let hasCommonId = arrIdTableCheck.some(elementA => tableNotEmpty.some(elementB => elementB.id === elementA.id));
+                    if (hasCommonId) {
+                        resolve({
+                            errCode: 4,
+                            errMessage: "Bàn này đã được đặt, vui lòng chọn bàn khác",
+                        });
+                    } else {
+                        let price = 0;
+                        let numberAdultBest = dataTicket.numberTicketType.numberAdultBest;
+                        let numberKidBest = dataTicket.numberTicketType.numberKidBest;
+
+                        price = (numberAdultBest * process.env.PRICE_TICKET_ADULT_BEST)
+                            + (numberKidBest * process.env.PRICE_TICKET_KID_BEST)
+
+                        let numberPeople = (
+                            numberAdultBest * 1 + numberKidBest * 1
+                        )
+
+                        let arrSchedule = await db.Schedule.findOne({
+                            where: {
+                                date: new Date(dataTicket.date),
+                                timeType: dataTicket.timeType,
+                                idGroup: arrGroupTable
+                            }
+                        })
+
+                        let ticketType = "";
+
+                        if (numberAdultBest > 0) {
+                            ticketType = ticketType + numberAdultBest + " vé người lớn ( online ), "
+                        }
+                        if (numberKidBest > 0) {
+                            ticketType = ticketType + numberKidBest + " vé trẻ em ( online )"
+                        }
+
+                        let transaction;
+                        try {
+                            transaction = await db.sequelize.transaction();
+                            const payToken = uuidv4();
+
+                            let ticket = await db.Ticket.create({
+                                idSchedule: arrSchedule.id,
+                                phoneCustomer: dataTicket.phoneCustomer,
+                                nameCustomer: dataTicket.nameCustomer,
+                                emailCustomer: dataTicket.email,
+                                numberPeople: numberPeople,
+                                ticketType: ticketType,
+                                numberAdult: 0,
+                                numberKid: 0,
+                                numberAdultBest: numberAdultBest,
+                                numberKidBest: numberKidBest,
+                                idStaff: 0,
+                                bill: price,
+                                payToken,
+                                payStatus: false,
+                                receiveStatus: false
+                            }, transaction)
+
+                            let ticketId = ticket.id;
+
+                            // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
+                            if (ticket) {
+                                await ticket.addTables(dataTicket.arrIdTable, { transaction });
+                                await handleSenMail(dataTicket, ticket);
+                                await transaction.commit();
+
+                                resolve({
+                                    errCode: 0,
+                                    errMessage: "Create a new ticket success",
+                                    ticketId
+                                });
+                            } else {
+                                await transaction.rollback(); // Rollback transaction nếu không tồn tại ticket
+                                resolve({
+                                    errCode: 3,
+                                    errMessage: "Ticket is undefined.",
+                                });
+                            }
+                        } catch (error) {
+                            if (transaction) await transaction.rollback();
+                            reject(error);
+                        }
+                    }
+                }
+            }
+            release();
+        } catch (error) {
+            release();
+            reject(error);
+        }
+    })
+}
+
+
+let handleSenMail = async (dataTicket, ticket) => {
+
+    const dateToMail = new Date(dataTicket.date);
+    var day = dateToMail.getDate();
+    var month = dateToMail.getMonth() + 1; // Lưu ý: Tháng bắt đầu từ 0 nên cần cộng thêm 1
+    var year = dateToMail.getFullYear();
+
+    // Định dạng lại ngày, tháng, năm theo định dạng mong muốn (dd/MM/YYYY)
+    var formattedDate = (day < 10 ? '0' : '') + day + '/' + (month < 10 ? '0' : '') + month + '/' + year;
+
+
+    let timeSlot = await db.Allcode.findOne({
+        where: { keyMap: dataTicket.timeType },
+        attributes: ['valueVi', 'valueEn']
+    })
+
+    // Chuỗi base64 của hình ảnh
+    const base64Image = dataTicket.imageBill
+
+    // Tạo buffer từ chuỗi base64
+    const base64Data = base64Image.replace(/^data:image\/png;base64,/, '');
+
+    const currentDate = new Date().getTime().toString();
+
+    // Tạo tên tệp dựa trên ngày giờ hiện tại
+    const fileName = `billImage_${currentDate}.jpg`;
+    const filePath = `./imageBill/${fileName}`;
+
+    // Ghi dữ liệu base64 vào tệp
+    fs.writeFile(filePath, base64Data, 'base64', (err) => {
+        if (err) {
+            console.error('Lỗi khi lưu ảnh:', err);
+        }
+    });
+
+
+    await sendMailServices.handleSendMailSystemTicket({
+        formattedDate,
+        timeType: timeSlot.valueVi,
+        phoneCustomer: dataTicket.phoneCustomer,
+        nameCustomer: dataTicket.nameCustomer,
+        emailCustomer: dataTicket.email,
+        fileName,
+        filePath,
+        numberAdultBest: ticket.numberAdultBest,
+        numberKidBest: ticket.numberKidBest,
+        bill: ticket.bill,
+        redirectLink: buildUrlEmail(ticket.id, ticket.payToken),
+        redirectLinkCancle: buildUrlEmailCancle(ticket.id, ticket.payToken),
+    });
+
+    fs.unlink(filePath, (err) => {
+        if (err) {
+            console.error("Lỗi khi xóa file:", err);
+        }
+    });
+}
+
+
+let verifyTicket = (data) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!data.ticketId || !data.payToken) {
+                resolve({
+                    errCode: 1,
+                    errMessage: 'Missing inputs parameter'
+                })
+            } else {
+                let ticket = await db.Ticket.findOne({
+                    where: {
+                        id: data.ticketId,
+                        payToken: data.payToken,
+                        payStatus: false
+                    }
+                })
+
+                if (ticket) {
+                    let transaction;
+                    try {
+                        transaction = await db.sequelize.transaction();
+                        await db.Ticket.update(
+                            { payStatus: true },
+                            { where: { id: ticket.id } },
+                            transaction
+                        );
+
+
+                        // FIRE RESPONSES
+                        let schedule = await db.Schedule.findOne({
+                            where: {
+                                id: ticket.idSchedule
+                            },
+                            attributes: ['date', 'timeType']
+                        })
+
+                        let timeSlot = await db.Allcode.findOne({
+                            where: { keyMap: schedule.timeType },
+                            attributes: ['valueVi', 'valueEn']
+                        })
+
+                        await sendMailServices.handleMailResponses({
+                            phoneCustomer: ticket.phoneCustomer,
+                            nameCustomer: ticket.nameCustomer,
+                            emailCustomer: ticket.emailCustomer,
+                            timeType: timeSlot.valueVi,
+                            numberAdultBest: ticket.numberAdultBest,
+                            numberKidBest: ticket.numberKidBest,
+                            bill: ticket.bill,
+                            numberPeople: ticket.numberPeople,
+                            date: moment(schedule.date).format('DD/MM/YYYY')
+                        }, { transaction });
+
+                        await transaction.commit();
+
+                        resolve({
+                            errCode: 0,
+                            errMessage: `Confirm`
+                        });
+                    } catch (error) {
+                        if (transaction) await transaction.rollback();
+                        reject(error);
+                    }
+                } else {
+                    resolve({
+                        errCode: 2,
+                        errMessage: `This ticket does not exist or has been claimed by another member`
+                    });
+                }
+            }
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
+
+let verifyTicketCancle = (data) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!data.ticketId || !data.payToken) {
+                resolve({
+                    errCode: 1,
+                    errMessage: 'Missing inputs parameter'
+                })
+            } else {
+                let ticket = await db.Ticket.findOne({
+                    where: {
+                        id: data.ticketId,
+                        payToken: data.payToken,
+                        payStatus: false
+                    }
+                })
+
+                if (ticket) {
+                    let transaction;
+                    try {
+                        transaction = await db.sequelize.transaction();
+                        // Xóa các bản ghi liên quan từ bảng trung gian
+                        await db.TicketTable.destroy({
+                            where: { ticketId: ticket.id },
+                            transaction
+                        });
+
+                        // Sau đó xóa Ticket
+                        await db.Ticket.destroy({
+                            where: { id: ticket.id },
+                            transaction
+                        });
+
+
+                        // FIRE RESPONSES
+                        let schedule = await db.Schedule.findOne({
+                            where: {
+                                id: ticket.idSchedule
+                            },
+                            attributes: ['date', 'timeType']
+                        })
+
+                        let timeSlot = await db.Allcode.findOne({
+                            where: { keyMap: schedule.timeType },
+                            attributes: ['valueVi', 'valueEn']
+                        })
+
+                        await sendMailServices.handleMailResponsesCancle({
+                            phoneCustomer: ticket.phoneCustomer,
+                            nameCustomer: ticket.nameCustomer,
+                            emailCustomer: ticket.emailCustomer,
+                            timeType: timeSlot.valueVi,
+                            numberAdultBest: ticket.numberAdultBest,
+                            numberKidBest: ticket.numberKidBest,
+                            bill: ticket.bill,
+                            numberPeople: ticket.numberPeople,
+                            date: moment(schedule.date).format('DD/MM/YYYY')
+                        }, { transaction });
+
+                        await transaction.commit();
+                        resolve({
+                            errCode: 0,
+                            errMessage: `Cancle`
+                        })
+
+                    } catch (error) {
+                        console.log(error);
+                        // Rollback transaction nếu có lỗi
+                        if (transaction) {
+                            await transaction.rollback();
+                        }
+                        reject(error);
+                    }
+                } else {
+                    resolve({
+                        errCode: 2,
+                        errMessage: `This ticket does not exist or has been claimed by another member`
+                    });
+                }
+            }
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
 
 
 let createTicket = (dataTicket) => {
     return new Promise(async (resolve, reject) => {
+        const release2 = await mutex.acquire();
         try {
             if (!dataTicket || !dataTicket.timeType || !dataTicket.date ||
                 !dataTicket.phoneCustomer || !dataTicket.nameCustomer ||
@@ -180,6 +561,11 @@ let createTicket = (dataTicket) => {
                     errMessage: 'Missing inputs parameter !'
                 });
             } else {
+                let tableNotEmpty = await tableServices.getTableEmptyByScheduleToBooking({
+                    date: dataTicket.date,
+                    timeType: dataTicket.timeType
+                });
+
                 let arrIdTableCheck = []
                 let arrGroupTable = [];
                 for (let i = 0; i < dataTicket.arrIdTable.length; i++) {
@@ -216,99 +602,111 @@ let createTicket = (dataTicket) => {
                         errMessage: "Không tìm ra Bàn, hoặc Nhân viên này",
                     });
                 } else {
-                    let price = 0;
-                    let numberAdult = dataTicket.numberTicketType.numberAdult;
-                    let numberKid = dataTicket.numberTicketType.numberKid;
-                    let numberAdultBest = dataTicket.numberTicketType.numberAdultBest;
-                    let numberKidBest = dataTicket.numberTicketType.numberKidBest;
-                    let numberDiscount = dataTicket.numberTicketType.numberDiscount;
+                    let hasCommonId = arrIdTableCheck.some(elementA => tableNotEmpty.some(elementB => elementB.id === elementA.id));
+                    if (hasCommonId) {
+                        resolve({
+                            errCode: 4,
+                            errMessage: "Bàn này đã được đặt, vui lòng chọn bàn khác",
+                        });
+                    } else {
+                        let price = 0;
+                        let numberAdult = dataTicket.numberTicketType.numberAdult;
+                        let numberKid = dataTicket.numberTicketType.numberKid;
+                        let numberAdultBest = dataTicket.numberTicketType.numberAdultBest;
+                        let numberKidBest = dataTicket.numberTicketType.numberKidBest;
+                        let numberDiscount = dataTicket.numberTicketType.numberDiscount;
 
-                    price = (numberAdult * process.env.PRICE_TICKET_ADULT)
-                        + (numberKid * process.env.PRICE_TICKET_KID)
-                        + (numberAdultBest * process.env.PRICE_TICKET_ADULT_BEST)
-                        + (numberKidBest * process.env.PRICE_TICKET_KID_BEST)
-                        + (numberDiscount * process.env.PRICE_TICKET_DISCOUNT)
+                        price = (numberAdult * process.env.PRICE_TICKET_ADULT)
+                            + (numberKid * process.env.PRICE_TICKET_KID)
+                            + (numberAdultBest * process.env.PRICE_TICKET_ADULT_BEST)
+                            + (numberKidBest * process.env.PRICE_TICKET_KID_BEST)
+                            + (numberDiscount * process.env.PRICE_TICKET_DISCOUNT)
 
-                    let numberPeople = (
-                        numberAdult * 1 + numberKid * 1
-                        + numberAdultBest * 1 + numberKidBest * 1
-                        + numberDiscount * 1
-                    )
+                        let numberPeople = (
+                            numberAdult * 1 + numberKid * 1
+                            + numberAdultBest * 1 + numberKidBest * 1
+                            + numberDiscount * 1
+                        )
 
 
-                    let arrSchedule = await db.Schedule.findOne({
-                        where: {
-                            date: new Date(dataTicket.date),
-                            timeType: dataTicket.timeType,
-                            idGroup: arrGroupTable
+                        let arrSchedule = await db.Schedule.findOne({
+                            where: {
+                                date: new Date(dataTicket.date),
+                                timeType: dataTicket.timeType,
+                                idGroup: arrGroupTable
+                            }
+                        })
+
+                        let ticketType = "";
+                        if (numberAdult > 0) {
+                            ticketType = ticketType + numberAdult + " vé người lớn, "
                         }
-                    })
-
-                    let ticketType = "";
-                    if (numberAdult > 0) {
-                        ticketType = ticketType + numberAdult + " vé người lớn, "
-                    }
-                    if (numberAdultBest > 0) {
-                        ticketType = ticketType + numberAdultBest + " vé người lớn ( online ), "
-                    }
-                    if (numberKid > 0) {
-                        ticketType = ticketType + numberKid + " vé trẻ em, "
-                    }
-                    if (numberKidBest > 0) {
-                        ticketType = ticketType + numberKidBest + " vé trẻ em ( online ), "
-                    }
-                    if (numberDiscount > 0) {
-                        ticketType = ticketType + numberDiscount + " vé discount"
-                    }
-                    let transaction;
-                    try {
-                        transaction = await db.sequelize.transaction();
-
-                        let ticket = await db.Ticket.create({
-                            idSchedule: arrSchedule.id,
-                            phoneCustomer: dataTicket.phoneCustomer,
-                            nameCustomer: dataTicket.nameCustomer,
-                            numberPeople: numberPeople,
-                            ticketType: ticketType,
-                            numberAdult: numberAdult,
-                            numberKid: numberKid,
-                            numberAdultBest: numberAdultBest,
-                            numberKidBest: numberKidBest,
-                            idStaff: dataTicket.idStaff,
-                            bill: price,
-                            payStatus: true,
-                            receiveStatus: dataTicket.receiveStatus
-                        }, { transaction })
-
-                        let ticketId = ticket.id;
-
-                        // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
-                        if (ticket) {
-                            await ticket.addTables(dataTicket.arrIdTable, { transaction });
-                            await transaction.commit();
-                            resolve({
-                                errCode: 0,
-                                errMessage: "Create a new ticket success",
-                                ticketId
-                            });
-                        } else {
-                            await transaction.rollback(); // Rollback transaction nếu không tồn tại ticket
-                            resolve({
-                                errCode: 3,
-                                errMessage: "Ticket is undefined.",
-                            });
+                        if (numberAdultBest > 0) {
+                            ticketType = ticketType + numberAdultBest + " vé người lớn ( online ), "
                         }
-                    } catch (error) {
-                        if (transaction) await transaction.rollback();
-                        reject(error);
+                        if (numberKid > 0) {
+                            ticketType = ticketType + numberKid + " vé trẻ em, "
+                        }
+                        if (numberKidBest > 0) {
+                            ticketType = ticketType + numberKidBest + " vé trẻ em ( online ), "
+                        }
+                        if (numberDiscount > 0) {
+                            ticketType = ticketType + numberDiscount + " vé discount"
+                        }
+                        let transaction;
+                        try {
+                            transaction = await db.sequelize.transaction();
+
+                            let ticket = await db.Ticket.create({
+                                idSchedule: arrSchedule.id,
+                                phoneCustomer: dataTicket.phoneCustomer,
+                                nameCustomer: dataTicket.nameCustomer,
+                                numberPeople: numberPeople,
+                                ticketType: ticketType,
+                                numberAdult: numberAdult,
+                                numberKid: numberKid,
+                                numberAdultBest: numberAdultBest,
+                                numberKidBest: numberKidBest,
+                                idStaff: dataTicket.idStaff,
+                                bill: price,
+                                payStatus: true,
+                                receiveStatus: dataTicket.receiveStatus
+                            }, { transaction })
+
+                            let ticketId = ticket.id;
+
+                            // Liên kết Ticket với các bản ghi Table thông qua mô hình trung gian TicketTable
+                            if (ticket) {
+                                await ticket.addTables(dataTicket.arrIdTable, { transaction });
+                                await transaction.commit();
+                                resolve({
+                                    errCode: 0,
+                                    errMessage: "Create a new ticket success",
+                                    ticketId
+                                });
+                            } else {
+                                await transaction.rollback(); // Rollback transaction nếu không tồn tại ticket
+                                resolve({
+                                    errCode: 3,
+                                    errMessage: "Ticket is undefined.",
+                                });
+                            }
+                        } catch (error) {
+                            if (transaction) await transaction.rollback();
+                            reject(error);
+                        }
                     }
                 }
             }
+            release2();
         } catch (error) {
+            release2();
             reject(error);
         }
     })
 }
+
+
 
 let updateTicket = (dataTicket, infoUser) => {
     return new Promise(async (resolve, reject) => {
@@ -482,9 +880,6 @@ let updatePayStatus = async (dataTicket) => {
         return false;
     }
 }
-
-
-
 
 
 let updateTicketOrder = (dataTicket, arrOrder) => {
@@ -669,5 +1064,5 @@ let getDataCToChart = (inputYear) => {
 }
 
 module.exports = {
-    createTicket, getAllTicket, getSummaryTicket, deleteTicket, updateTicket, updateTicketOrder, getDataCToChart
+    createTicket, createTicketByCustomer, verifyTicket, verifyTicketCancle, getAllTicket, getSummaryTicket, deleteTicket, updateTicket, updateTicketOrder, getDataCToChart
 }

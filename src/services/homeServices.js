@@ -60,6 +60,9 @@ let getDataHome = () => {
                 ],
                 where: {
                     payStatus: true,
+                    // idStaff: {
+                    //     [Sequelize.Op.ne]: 0 // Sử dụng Op.ne để tìm idStaff khác 0
+                    // },
                     createdAt: {
                         [Sequelize.Op.between]: [today, tomorrow],
                     },

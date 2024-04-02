@@ -23,7 +23,7 @@ const initWebRoute = (app) => {
 
 
 
-    // API
+    //                            API SYSTEM ADIM
     router.all('*', checkMiddelwareUserJWT, checkUserPermissonJWT)
 
     router.post('/api/login', userController.handleLogin);
@@ -69,6 +69,7 @@ const initWebRoute = (app) => {
 
     router.post('/api/get-all-ticket', ticketController.handleGetAllTicket);
     router.post('/api/create-ticket', ticketController.handleCreateNewTicket);
+    router.post('/api/verify-ticket', ticketController.handleVerifyTicket);
     router.put('/api/update-ticket', ticketController.handleUpdateTicket);
     router.delete('/api/delete-ticket', ticketController.handleDeleteTicket);
     router.get('/api/get-data-chart', ticketController.handleGetDataCToChart);
@@ -80,9 +81,16 @@ const initWebRoute = (app) => {
 
     router.get('/api/get-data-home', homeController.handleGetDataHome)
 
+    //                            API SYSTEM USER
+    router.get('/api/user/get-all-menu', menuController.handleGetAllMenu);
 
+    router.post('/api/user/get-schedule2', scheduleController.handleGetSchedule2);
 
+    router.post('/api/user/get-table-empty', tableController.handleGetTableEmptyBySchedule);
 
+    router.post('/api/user/create-ticket', ticketController.handleCreateNewTicket);
+
+    router.get('/api/user/get-top-staff-home', staffController.getTopStaffHome);
     return app.use('/', router)
 }
 

@@ -281,6 +281,95 @@ let getTableEmptyBySchedule = (dataSchedule) => {
     });
 }
 
+let getTableEmptyByScheduleToBooking = (dataSchedule) => {
+    // dataSchedule ( date, timeType)
+    return new Promise(async (resolve, reject) => {
+        try {
+            const today = new Date(dataSchedule.date);
+            today.setUTCHours(0, 0, 0, 0); // Đặt giờ, phút, giây và millisecond về 0 để có thời điểm bắt đầu ngày
+
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+
+            const arrTimeType = [
+                addTimeType(dataSchedule.timeType, -1),
+                addTimeType(dataSchedule.timeType, -2),
+                dataSchedule.timeType,
+                addTimeType(dataSchedule.timeType, 1),
+                addTimeType(dataSchedule.timeType, 2)
+            ];
+
+            let arrSchedule = await db.Schedule.findAll({
+                where: {
+                    date: {
+                        [Op.between]: [today, tomorrow],
+                    },
+                    timeType: {
+                        [db.Sequelize.Op.in]: arrTimeType
+                    }
+                }
+            });
+
+            let arrSheduleIdGroup = await db.Schedule.findAll({
+                where: {
+                    date: {
+                        [Op.between]: [today, tomorrow],
+                    },
+                    timeType: dataSchedule.timeType
+                }
+            });
+
+
+            // arrSchedule (id, date, timeType, idGroup)
+            let arr_ticket_booked = [];
+            for (let i = 0; i < arrSchedule.length; i++) {
+                let ticket_booked = await db.Ticket.findAll({
+                    where: { idSchedule: arrSchedule[i].id },
+                    include: [
+                        { model: db.Table, attributes: ['id'] },
+                    ],
+                    raw: true,
+                    nest: true
+                })
+                if (ticket_booked && ticket_booked.length > 0) {
+                    ticket_booked.map(item => {
+                        arr_ticket_booked.push(item);
+                    })
+                }
+            }
+
+            let arrIdGroup = arrSheduleIdGroup.map(item => {
+                return item.idGroup
+            })
+
+            let table = await db.Table.findAll({
+                where: { idGroup: arrIdGroup },
+                order: [['id', 'ASC']]
+            });
+
+            if (arr_ticket_booked && arr_ticket_booked.length > 0) {
+                // nếu tồn tại vé theo idSchedule
+                for (let i = 0; i < arr_ticket_booked.length; i++) {
+                    table.map((item) => {
+                        if (item.status === true) {
+                            // chỉ xử lý bàn đang hoạt động
+                            if (item.id === arr_ticket_booked[i].Tables.id) {
+                                item.isEmpty = false;
+                            }
+                        }
+                    })
+                }
+            }
+
+            let tableNotEmpty = table.filter(item => item.status === true && item.isEmpty === false);
+
+            resolve(tableNotEmpty);
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
 module.exports = {
-    createTable, updateTable, deleteTable, getAllTable, getTableEmptyBySchedule
+    createTable, updateTable, deleteTable, getAllTable, getTableEmptyBySchedule, getTableEmptyByScheduleToBooking
 }

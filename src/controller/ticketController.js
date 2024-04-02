@@ -29,7 +29,12 @@ let handleGetAllTicket = async (req, res) => {
 let handleCreateNewTicket = async (req, res) => {
     try {
         let dataTicket = req.body;
-        let ticket = await ticketServices.createTicket(dataTicket);
+        let ticket;
+        if (dataTicket.idStaff === 0 && 'email' in dataTicket && 'imageBill' in dataTicket) {
+            ticket = await ticketServices.createTicketByCustomer(dataTicket);
+        } else {
+            ticket = await ticketServices.createTicket(dataTicket);
+        }
         return res.status(200).json(ticket);
     } catch (error) {
         console.log(error);
@@ -39,6 +44,26 @@ let handleCreateNewTicket = async (req, res) => {
         })
     }
 
+}
+
+let handleVerifyTicket = async (req, res) => {
+    try {
+        let info;
+        if ('cancle' in req.body) {
+            info = await ticketServices.verifyTicketCancle(req.body);
+        } else {
+            info = await ticketServices.verifyTicket(req.body);
+        }
+        return res.status(200).json(
+            info
+        )
+    } catch (error) {
+        console.log(error);
+        return res.status(200).json({
+            errCode: -1,
+            errMessage: 'Error from the Server'
+        })
+    }
 }
 
 let handleUpdateTicket = async (req, res) => {
@@ -107,5 +132,5 @@ let handleGetDataCToChart = async (req, res) => {
 
 
 module.exports = {
-    handleGetAllTicket, handleCreateNewTicket, handleUpdateTicket, handleDeleteTicket, handleGetDataCToChart
+    handleGetAllTicket, handleCreateNewTicket, handleVerifyTicket, handleUpdateTicket, handleDeleteTicket, handleGetDataCToChart
 }

@@ -5,7 +5,26 @@ import jwt from "jsonwebtoken";
 const nonSecurePath = [
     '/', '/api/login', '/api/register', '/api/logout',
     '/api/verify-user',
-    '/api/get-about', '/api/get-top-staff-home'
+    '/api/get-about', '/api/get-top-staff-home',
+
+    // API OF USER
+    '/api/user/create-ticket',
+    '/api/user/get-schedule2',
+    '/api/user/get-all-menu',
+    '/api/user/get-table-empty',
+    '/api/user/get-top-staff-home'
+
+
+    // '/api/get-data-home',
+    // '/api/get-all-user', '/api/create-new-user', '/api/edit-user', '/api/delete-user',
+    // '/api/get-all-code',
+    // '/api/get-all-menu', '/api/create-new-dish', '/api/edit-dish', '/api/delete-dish',
+    // '/api/get-about', '/api/edit-about',
+    // '/api/get-schedule', '/api/get-schedule2', '/api/bulk-create-schedule',
+    // '/api/get-all-table', '/api/create-table', '/api/update-table', '/api/delete-table', '/api/get-table-empty',
+    // '/api/get-all-ticket', '/api/update-ticket', '/api/delete-ticket',
+    // '/api/get-data-chart',
+    // '/api/get-all-group'
 ];
 // các path này sẽ không cần check quyền đăng nhập
 
@@ -118,6 +137,7 @@ const checkUserPermissonJWT = (req, res, next) => {
                         '/api/get-schedule', '/api/get-schedule2', '/api/bulk-create-schedule',
                         '/api/get-all-table', '/api/create-table', '/api/update-table', '/api/delete-table', '/api/get-table-empty',
                         '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket', '/api/delete-ticket',
+                        '/api/verify-ticket',
                         '/api/get-data-chart',
                         '/api/get-all-group'
                     ];
@@ -132,6 +152,7 @@ const checkUserPermissonJWT = (req, res, next) => {
                         '/api/get-schedule', '/api/get-schedule2', '/api/bulk-create-schedule',
                         '/api/get-all-table', '/api/create-table', '/api/update-table', '/api/delete-table', '/api/get-table-empty',
                         '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket',
+                        '/api/verify-ticket',
                         '/api/get-data-chart',
                         '/api/get-all-group'
                     ];
@@ -147,12 +168,6 @@ const checkUserPermissonJWT = (req, res, next) => {
                         '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket',
                         '/api/get-data-chart'
                     ];
-                    break;
-                case 'R3':
-                    path = ['/api/get-top-staff-home',
-                        '/api/get-schedule',
-                        '/api/get-all-table',
-                        '/api/get-about'];
                     break;
                 default:
                     break;

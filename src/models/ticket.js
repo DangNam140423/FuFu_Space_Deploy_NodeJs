@@ -18,6 +18,7 @@ module.exports = (sequelize, DataTypes) => {
         numberPeople: DataTypes.INTEGER,
         phoneCustomer: DataTypes.STRING,
         nameCustomer: DataTypes.STRING,
+        emailCustomer: DataTypes.STRING,
         ticketType: DataTypes.STRING,
         numberAdult: DataTypes.INTEGER,
         numberKid: DataTypes.INTEGER,
@@ -28,6 +29,7 @@ module.exports = (sequelize, DataTypes) => {
         dishOrder: DataTypes.STRING,
         priceOrder: DataTypes.INTEGER,
         payStatus: DataTypes.BOOLEAN,
+        payToken: DataTypes.STRING,
         receiveStatus: DataTypes.BOOLEAN,
         createdAt: DataTypes.DATE,
     }, {

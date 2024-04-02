@@ -232,7 +232,7 @@ let handleMailResponsesCancle = async (data) => {
 
     content += `
             <p><b>- Tổng hóa đơn:<b> ${(data.bill * 1).toLocaleString('vi', { style: 'currency', currency: 'VND' })}</p>
-            <p>Nếu bạn muốn đặt lại vé, hãy truy cập đường link sau để đặt lại: <a href="${process.env.URL_REACT_USER}/booking">FuFu'Space</a></p>
+            <p>Nếu bạn muốn đặt lại vé, hãy truy cập đường link sau để đặt lại: <a href="${process.env.URL_REACT_USER}">FuFu'Space</a></p>
             <p>Hoặc bạn có bất kỳ thắc mắc hay cần hỗ trợ thêm, đừng ngần ngại liên hệ với chúng tôi qua số điện thoại 0349601619/0901673037 hoặc email này.</p>
             <p>Trân trọng, <b>Fufu's Space</b></p>
         </div>

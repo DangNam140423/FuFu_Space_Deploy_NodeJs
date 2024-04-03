@@ -325,61 +325,68 @@ let createTicketByCustomer = (dataTicket) => {
 
 
 let handleSenMail = async (dataTicket, ticket) => {
+    try {
+        const dateToMail = new Date(dataTicket.date);
+        var day = dateToMail.getDate();
+        var month = dateToMail.getMonth() + 1; // Lưu ý: Tháng bắt đầu từ 0 nên cần cộng thêm 1
+        var year = dateToMail.getFullYear();
 
-    const dateToMail = new Date(dataTicket.date);
-    var day = dateToMail.getDate();
-    var month = dateToMail.getMonth() + 1; // Lưu ý: Tháng bắt đầu từ 0 nên cần cộng thêm 1
-    var year = dateToMail.getFullYear();
-
-    // Định dạng lại ngày, tháng, năm theo định dạng mong muốn (dd/MM/YYYY)
-    var formattedDate = (day < 10 ? '0' : '') + day + '/' + (month < 10 ? '0' : '') + month + '/' + year;
-
-
-    let timeSlot = await db.Allcode.findOne({
-        where: { keyMap: dataTicket.timeType },
-        attributes: ['valueVi', 'valueEn']
-    })
-
-    // Chuỗi base64 của hình ảnh
-    const base64Image = dataTicket.imageBill
-
-    // Tạo buffer từ chuỗi base64
-    const base64Data = base64Image.replace(/^data:image\/png;base64,/, '');
-
-    const currentDate = new Date().getTime().toString();
-
-    // Tạo tên tệp dựa trên ngày giờ hiện tại
-    const fileName = `billImage_${currentDate}.jpg`;
-    const filePath = `./imageBill/${fileName}`;
-
-    // Ghi dữ liệu base64 vào tệp
-    fs.writeFile(filePath, base64Data, 'base64', (err) => {
-        if (err) {
-            console.error('Lỗi khi lưu ảnh:', err);
-        }
-    });
+        // Định dạng lại ngày, tháng, năm theo định dạng mong muốn (dd/MM/YYYY)
+        var formattedDate = (day < 10 ? '0' : '') + day + '/' + (month < 10 ? '0' : '') + month + '/' + year;
 
 
-    await sendMailServices.handleSendMailSystemTicket({
-        formattedDate,
-        timeType: timeSlot.valueVi,
-        phoneCustomer: dataTicket.phoneCustomer,
-        nameCustomer: dataTicket.nameCustomer,
-        emailCustomer: dataTicket.email,
-        fileName,
-        filePath,
-        numberAdultBest: ticket.numberAdultBest,
-        numberKidBest: ticket.numberKidBest,
-        bill: ticket.bill,
-        redirectLink: buildUrlEmail(ticket.id, ticket.payToken),
-        redirectLinkCancle: buildUrlEmailCancle(ticket.id, ticket.payToken),
-    });
+        let timeSlot = await db.Allcode.findOne({
+            where: { keyMap: dataTicket.timeType },
+            attributes: ['valueVi', 'valueEn']
+        })
 
-    fs.unlink(filePath, (err) => {
-        if (err) {
-            console.error("Lỗi khi xóa file:", err);
-        }
-    });
+        // Chuỗi base64 của hình ảnh
+        const base64Image = dataTicket.imageBill
+
+        // Tạo buffer từ chuỗi base64
+        const base64Data = base64Image.replace(/^data:image\/png;base64,/, '');
+
+        const currentDate = new Date().getTime().toString();
+
+        // Tạo tên tệp dựa trên ngày giờ hiện tại
+        const fileName = `billImage_${currentDate}.jpg`;
+        const filePath = `./imageBill/${fileName}`;
+
+        // Ghi dữ liệu base64 vào tệp
+        fs.writeFile(filePath, base64Data, 'base64', async (err) => {
+            if (err) {
+                console.error('Lỗi khi lưu ảnh:', err);
+            } else {
+                try {
+                    await sendMailServices.handleSendMailSystemTicket({
+                        formattedDate,
+                        timeType: timeSlot.valueVi,
+                        phoneCustomer: dataTicket.phoneCustomer,
+                        nameCustomer: dataTicket.nameCustomer,
+                        emailCustomer: dataTicket.email,
+                        fileName,
+                        filePath,
+                        numberAdultBest: ticket.numberAdultBest,
+                        numberKidBest: ticket.numberKidBest,
+                        bill: ticket.bill,
+                        redirectLink: buildUrlEmail(ticket.id, ticket.payToken),
+                        redirectLinkCancle: buildUrlEmailCancle(ticket.id, ticket.payToken),
+                    });
+                    fs.unlink(filePath, (err) => {
+                        if (err) {
+                            console.error("Lỗi khi xóa file:", err);
+                        }
+                    });
+                } catch (error) {
+                    console.error('Lỗi khi gửi email:', error);
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Có lỗi xảy ra:', error);
+    }
+
+
 }
 
 

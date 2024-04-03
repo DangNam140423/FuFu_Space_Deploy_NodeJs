@@ -174,12 +174,24 @@ let handleMailResponses = async (data) => {
     let attachments = [];
 
 
+    const path = require('path');
+
+    // Đường dẫn thư mục gốc của ứng dụng trên Heroku
+    const rootPath = process.cwd();
+
+    // Đường dẫn thư mục lưu trữ ảnh
+    const imageTicketDir = path.join(rootPath, 'imageTicket');
+
     for (let i = 1; i <= data.numberPeople; i++) {
         if (i <= 9) {
             let fileName = `ticketImage_${i}.jpg`;
+
+            // Tạo đường dẫn tệp
+            const filePath = path.join(imageTicketDir, fileName);
+
             let attachment = {
                 filename: `ticketImage_${i}.jpg`,
-                path: `./imageTicket/${fileName}`
+                path: filePath
             };
             attachments.push(attachment);
         }

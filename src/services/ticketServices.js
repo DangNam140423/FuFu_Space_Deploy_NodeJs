@@ -186,6 +186,34 @@ let buildUrlEmailCancle = (idTicket, payToken) => {
     return result
 }
 
+// Sử dụng một promise để ghi file
+const writeFilePromise = (filePath, base64Data) => {
+    return new Promise((resolve, reject) => {
+        fs.writeFile(filePath, base64Data, 'base64', (err) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve();
+            }
+        });
+    });
+};
+
+
+// Sử dụng một promise để xóa file
+const unlinkPromise = (filePath) => {
+    return new Promise((resolve, reject) => {
+        fs.unlink(filePath, (err) => {
+            if (err) {
+                console.error("Lỗi khi xóa file:", err);
+                reject(err);
+            } else {
+                resolve();
+            }
+        });
+    });
+};
+
 let createTicketByCustomer = (dataTicket) => {
     return new Promise(async (resolve, reject) => {
         const release = await mutex.acquire();
@@ -320,16 +348,23 @@ let createTicketByCustomer = (dataTicket) => {
 
                                     // Tạo tên tệp dựa trên ngày giờ hiện tại
                                     const fileName = `billImage_${currentDate}.jpg`;
-                                    const filePath = `./imageBill/${fileName}`;
+                                    // const filePath = `./imageBill/${fileName}`;
+
+
+                                    const path = require('path');
+                                    // Đường dẫn thư mục gốc của ứng dụng trên Heroku
+                                    const rootPath = process.cwd();
+                                    // Đường dẫn thư mục lưu trữ ảnh
+                                    const imageBillDir = path.join(rootPath, 'imageBill');
+                                    // Tạo đường dẫn tệp
+                                    const filePath = path.join(imageBillDir, fileName);
                                     console.log("checkFile: ", filePath);
 
                                     // Ghi dữ liệu base64 vào tệp
-                                    fs.writeFile(filePath, base64Data, 'base64', async (err) => {
-                                        if (err) {
-                                            await transaction.rollback();
-                                            console.error('Lỗi khi lưu ảnh:', err);
-                                        } else {
+                                    await writeFilePromise(filePath, base64Data)
+                                        .then(async () => {
                                             try {
+                                                // Thực hiện gửi email
                                                 await sendMailServices.handleSendMailSystemTicket({
                                                     formattedDate,
                                                     timeType: timeSlot.valueVi,
@@ -344,27 +379,54 @@ let createTicketByCustomer = (dataTicket) => {
                                                     redirectLink: buildUrlEmail(ticket.id, ticket.payToken),
                                                     redirectLinkCancle: buildUrlEmailCancle(ticket.id, ticket.payToken),
                                                 });
-                                                fs.unlink(filePath, (err) => {
-                                                    if (err) {
-                                                        transaction.rollback();
-                                                        console.error("Lỗi khi xóa file:", err);
-                                                    }
-                                                });
 
+                                                // Commit transaction nếu mọi thứ thành công
                                                 await transaction.commit();
+
+                                                // Trả về kết quả thành công
                                                 resolve({
                                                     errCode: 0,
                                                     errMessage: "Create a new ticket success",
                                                     ticketId
                                                 });
                                             } catch (error) {
+                                                // Nếu gặp lỗi khi gửi email, rollback transaction
+                                                await transaction.rollback();
                                                 console.error('Lỗi khi gửi email:', error);
+                                                resolve({
+                                                    errCode: 6,
+                                                    errMessage: "Lỗi khi gửi email.",
+                                                });
                                             }
-                                        }
+                                        })
+                                        .catch(async (err) => {
+                                            // Nếu writeFilePromise gặp lỗi, rollback transaction và xử lý lỗi
+                                            await transaction.rollback();
+                                            console.error('Lỗi khi ghi file:', err);
+                                            resolve({
+                                                errCode: 5,
+                                                errMessage: "Không tìm thấy ảnh bill.",
+                                            });
+                                        });
+
+                                    // Gọi unlinkPromise và xử lý lỗi (nếu có)
+                                    await unlinkPromise(filePath).catch(async (err) => {
+                                        // Nếu gặp lỗi khi xóa file, rollback transaction và xử lý lỗi
+                                        await transaction.rollback();
+                                        console.error('Lỗi khi xóa file:', err);
+                                        resolve({
+                                            errCode: 5,
+                                            errMessage: "Không tìm thấy ảnh bill.",
+                                        });
                                     });
+
                                 } catch (error) {
                                     await transaction.rollback();
                                     console.error('Có lỗi xảy ra:', error);
+                                    resolve({
+                                        errCode: 6,
+                                        errMessage: "Lỗi khi gửi email.",
+                                    });
                                 }
                             } else {
                                 await transaction.rollback(); // Rollback transaction nếu không tồn tại ticket

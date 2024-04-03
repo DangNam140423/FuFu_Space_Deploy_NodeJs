@@ -114,7 +114,7 @@ let handleSendMailSystemTicket = async (data) => {
 
     let info = await transporter.sendMail({
         from: 'FuFu Ticket System' + '<' + process.env.EMAIL_APP + '>',
-        to: recipients.join(', '),
+        to: emails.join(', '),
         subject: 'Xác nhận vé online cho khách hàng',
         html: content,
         attachments: [

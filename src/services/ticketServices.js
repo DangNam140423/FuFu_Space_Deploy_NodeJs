@@ -342,7 +342,8 @@ let createTicketByCustomer = (dataTicket) => {
                                     const base64Image = dataTicket.imageBill
 
                                     // Tạo buffer từ chuỗi base64
-                                    const base64Data = base64Image.replace(/^data:image\/png;base64,/, '');
+                                    // const base64Data = base64Image.replace(/^data:image\/png;base64,/, '');
+                                    const base64Data = base64Image.replace(/^data:image\/(png|jpeg|jpg|gif);base64,/, '');
 
                                     const currentDate = new Date().getTime().toString();
 
@@ -358,7 +359,6 @@ let createTicketByCustomer = (dataTicket) => {
                                     const imageBillDir = path.join(rootPath, 'imageBill');
                                     // Tạo đường dẫn tệp
                                     const filePath = path.join(imageBillDir, fileName);
-                                    console.log("checkFile: ", filePath);
 
                                     // Ghi dữ liệu base64 vào tệp
                                     await writeFilePromise(filePath, base64Data)

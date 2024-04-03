@@ -182,20 +182,35 @@ let handleMailResponses = async (data) => {
     // Đường dẫn thư mục lưu trữ ảnh
     const imageTicketDir = path.join(rootPath, 'imageTicket');
 
-    for (let i = 1; i <= data.numberPeople; i++) {
-        if (i <= 9) {
-            let fileName = `ticketImage_${i}.jpg`;
+    if (data.numberPeople <= 9) {
+        for (let i = 1; i <= data.numberPeople; i++) {
+            if (i <= 9) {
+                let fileName = `ticketImage_${i}.jpg`;
 
-            // Tạo đường dẫn tệp
-            const filePath = path.join(imageTicketDir, fileName);
+                // Tạo đường dẫn tệp
+                const filePath = path.join(imageTicketDir, fileName);
 
-            let attachment = {
-                filename: `ticketImage_${i}.jpg`,
-                path: filePath
-            };
-            attachments.push(attachment);
+                let attachment = {
+                    filename: `ticketImage_${i}.jpg`,
+                    path: filePath
+                };
+                attachments.push(attachment);
+            }
         }
+    } else {
+        let fileName = `ticketImage_5.jpg`;
+
+        // Tạo đường dẫn tệp
+        const filePath = path.join(imageTicketDir, fileName);
+
+        let attachment = {
+            filename: `ticketImage_5.jpg`,
+            path: filePath
+        };
+        attachments.push(attachment);
     }
+
+
 
     let info = await transporter.sendMail({
         from: 'FuFu Ticket System' + '<' + process.env.EMAIL_APP + '>',

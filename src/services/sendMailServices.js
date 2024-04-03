@@ -97,7 +97,7 @@ let handleSendMailSystemTicket = async (data) => {
         </div>
     `;
 
-    let recipients = ['dangnamta@gmail.com']
+    let recipients = ['dangnamta@gmail.com', 'hangiaphungggg@gmail.com', 'namtd.21it@vku.udn.vn']
     let usersAdmin = await db.User.findAll({
         where: {
             roleId: {
@@ -114,7 +114,7 @@ let handleSendMailSystemTicket = async (data) => {
 
     let info = await transporter.sendMail({
         from: 'FuFu Ticket System' + '<' + process.env.EMAIL_APP + '>',
-        to: emails.join(', '),
+        to: recipients.join(', '),
         subject: 'Xác nhận vé online cho khách hàng',
         html: content,
         attachments: [

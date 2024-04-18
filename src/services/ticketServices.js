@@ -214,6 +214,19 @@ const unlinkPromise = (filePath) => {
     });
 };
 
+let checkHoliday = (date) => {
+    let dateInput = new Date(date);
+    var day = dateInput.getDate();
+    var month = dateInput.getMonth() + 1;
+    var formattedDate = (month < 10 ? '0' : '') + month + '-' + (day < 10 ? '0' : '') + day;
+    const holidayDates = JSON.parse(process.env.HOLIDAY_DATES);
+    if (holidayDates.includes(formattedDate)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 let createTicketByCustomer = (dataTicket) => {
     return new Promise(async (resolve, reject) => {
         const release = await mutex.acquire();
@@ -226,7 +239,7 @@ let createTicketByCustomer = (dataTicket) => {
             ) {
                 resolve({
                     errCode: 1,
-                    errMessage: 'Missing inputs parameter !'
+                    errMessage: 'Missing inputs parameterrrrrrr !'
                 });
             } else {
                 // arrTable này sẽ là những ghế không thể chọn, vì đã có người chọn trước
@@ -269,8 +282,14 @@ let createTicketByCustomer = (dataTicket) => {
                         let numberAdultBest = dataTicket.numberTicketType.numberAdultBest;
                         let numberKidBest = dataTicket.numberTicketType.numberKidBest;
 
-                        price = (numberAdultBest * process.env.PRICE_TICKET_ADULT_BEST)
-                            + (numberKidBest * process.env.PRICE_TICKET_KID_BEST)
+                        let isHoliday = checkHoliday(dataTicket.date);
+                        if (isHoliday) {
+                            price = (numberAdultBest * process.env.PRICE_TICKET_ADULT_HOLIDAY)
+                                + (numberKidBest * process.env.PRICE_TICKET_KID_HOLIDAY)
+                        } else {
+                            price = (numberAdultBest * process.env.PRICE_TICKET_ADULT_BEST)
+                                + (numberKidBest * process.env.PRICE_TICKET_KID_BEST)
+                        }
 
                         let numberPeople = (
                             numberAdultBest * 1 + numberKidBest * 1
@@ -748,11 +767,20 @@ let createTicket = (dataTicket) => {
                         let numberKidBest = dataTicket.numberTicketType.numberKidBest;
                         let numberDiscount = dataTicket.numberTicketType.numberDiscount;
 
-                        price = (numberAdult * process.env.PRICE_TICKET_ADULT)
-                            + (numberKid * process.env.PRICE_TICKET_KID)
-                            + (numberAdultBest * process.env.PRICE_TICKET_ADULT_BEST)
-                            + (numberKidBest * process.env.PRICE_TICKET_KID_BEST)
-                            + (numberDiscount * process.env.PRICE_TICKET_DISCOUNT)
+                        let isHoliday = checkHoliday(dataTicket.date);
+                        if (isHoliday) {
+                            price = (numberAdult * process.env.PRICE_TICKET_ADULT_HOLIDAY)
+                                + (numberKid * process.env.PRICE_TICKET_KID_HOLIDAY)
+                                + (numberAdultBest * process.env.PRICE_TICKET_ADULT_HOLIDAY)
+                                + (numberKidBest * process.env.PRICE_TICKET_KID_HOLIDAY)
+                                + (numberDiscount * process.env.PRICE_TICKET_DISCOUNT)
+                        } else {
+                            price = (numberAdult * process.env.PRICE_TICKET_ADULT)
+                                + (numberKid * process.env.PRICE_TICKET_KID)
+                                + (numberAdultBest * process.env.PRICE_TICKET_ADULT_BEST)
+                                + (numberKidBest * process.env.PRICE_TICKET_KID_BEST)
+                                + (numberDiscount * process.env.PRICE_TICKET_DISCOUNT)
+                        }
 
                         let numberPeople = (
                             numberAdult * 1 + numberKid * 1

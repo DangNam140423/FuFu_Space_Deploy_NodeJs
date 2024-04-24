@@ -575,7 +575,7 @@ let verifyTicket = (data) => {
                             attributes: ['valueVi', 'valueEn']
                         })
 
-                        await sendMailServices.handleMailResponses({
+                        let emailSent = await sendMailServices.handleMailResponses({
                             phoneCustomer: ticket.phoneCustomer,
                             nameCustomer: ticket.nameCustomer,
                             emailCustomer: ticket.emailCustomer,
@@ -587,12 +587,20 @@ let verifyTicket = (data) => {
                             date: moment(schedule.date).format('DD/MM/YYYY')
                         }, { transaction });
 
-                        await transaction.commit();
+                        if (emailSent) {
+                            await transaction.commit();
+                            resolve({
+                                errCode: 0,
+                                errMessage: `Confirm`
+                            });
+                        } else {
+                            await transaction.rollback();
+                            resolve({
+                                errCode: 3,
+                                errMessage: `Failed to send email`
+                            });
+                        }
 
-                        resolve({
-                            errCode: 0,
-                            errMessage: `Confirm`
-                        });
                     } catch (error) {
                         if (transaction) await transaction.rollback();
                         reject(error);
@@ -657,7 +665,7 @@ let verifyTicketCancle = (data) => {
                             attributes: ['valueVi', 'valueEn']
                         })
 
-                        await sendMailServices.handleMailResponsesCancle({
+                        let emailSent = await sendMailServices.handleMailResponsesCancle({
                             phoneCustomer: ticket.phoneCustomer,
                             nameCustomer: ticket.nameCustomer,
                             emailCustomer: ticket.emailCustomer,
@@ -669,11 +677,19 @@ let verifyTicketCancle = (data) => {
                             date: moment(schedule.date).format('DD/MM/YYYY')
                         }, { transaction });
 
-                        await transaction.commit();
-                        resolve({
-                            errCode: 0,
-                            errMessage: `Cancle`
-                        })
+                        if (emailSent) {
+                            await transaction.commit();
+                            resolve({
+                                errCode: 0,
+                                errMessage: `Cancle`
+                            })
+                        } else {
+                            await transaction.rollback();
+                            resolve({
+                                errCode: 3,
+                                errMessage: `Failed to cancle`
+                            });
+                        }
 
                     } catch (error) {
                         console.log(error);

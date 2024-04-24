@@ -97,7 +97,7 @@ let handleSendMailSystemTicket = async (data) => {
         </div>
     `;
 
-    let recipients = ['dangnamta@gmail.com', 'hangiaphungggg@gmail.com', 'namtd.21it@vku.udn.vn']
+    let recipients = ['dangnamta@gmail.com']
     let usersAdmin = await db.User.findAll({
         where: {
             roleId: {
@@ -127,17 +127,18 @@ let handleSendMailSystemTicket = async (data) => {
 }
 
 let handleMailResponses = async (data) => {
-    let transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false,
-        auth: {
-            user: process.env.EMAIL_APP,
-            pass: process.env.EMAIL_APP_PASSWORD,
-        },
-    });
+    try {
+        let transporter = nodemailer.createTransport({
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_APP,
+                pass: process.env.EMAIL_APP_PASSWORD,
+            },
+        });
 
-    let content = `
+        let content = `
     <div style="padding: 10px; background-color: #003375; font-size: 16px">
         <div style="padding: 5px; background-color: white;">
             <img style="height: 95px" src="${process.env.URL_REACT_USER}/static/media/logo_fufu.89fef136.jpg" alt="ticketImage"/>
@@ -151,15 +152,15 @@ let handleMailResponses = async (data) => {
             <p><b>- Email:</b> ${data.emailCustomer}</p>
             `;
 
-    if (data.numberAdultBest > 0) {
-        content += `<p><b>- Số lượng người lớn:</b> ${data.numberAdultBest}</p>`;
-    }
+        if (data.numberAdultBest > 0) {
+            content += `<p><b>- Số lượng người lớn:</b> ${data.numberAdultBest}</p>`;
+        }
 
-    if (data.numberKidBest > 0) {
-        content += `<p><b>- Số lượng trẻ em:</b> ${data.numberKidBest}</p>`;
-    }
+        if (data.numberKidBest > 0) {
+            content += `<p><b>- Số lượng trẻ em:</b> ${data.numberKidBest}</p>`;
+        }
 
-    content += `
+        content += `
             <p><b>- Tổng hóa đơn:<b> ${(data.bill * 1).toLocaleString('vi', { style: 'currency', currency: 'VND' })}</p>
             <p>Đơn đặt chỗ của bạn đã được xác nhận. Hãy mang theo email này khi đến quán để được nhận vé vật lý tại cổng nha. Quý khách hãy có mặt trước 5 phút trước giờ đặt để nhận vé một cách thuận lợi.</p>
             <p><b>Vé điện tử (E-Ticket):</b> [Đính kèm bên dưới]</p>
@@ -171,69 +172,78 @@ let handleMailResponses = async (data) => {
 `;
 
 
-    let attachments = [];
+        let attachments = [];
 
 
-    const path = require('path');
+        const path = require('path');
 
-    // Đường dẫn thư mục gốc của ứng dụng trên Heroku
-    const rootPath = process.cwd();
+        // Đường dẫn thư mục gốc của ứng dụng trên Heroku
+        const rootPath = process.cwd();
 
-    // Đường dẫn thư mục lưu trữ ảnh
-    const imageTicketDir = path.join(rootPath, 'imageTicket');
+        // Đường dẫn thư mục lưu trữ ảnh
+        const imageTicketDir = path.join(rootPath, 'imageTicket');
 
-    if (data.numberPeople <= 9) {
-        for (let i = 1; i <= data.numberPeople; i++) {
-            if (i <= 9) {
-                let fileName = `ticketImage_${i}.jpg`;
+        if (data.numberPeople <= 9) {
+            for (let i = 1; i <= data.numberPeople; i++) {
+                if (i <= 9) {
+                    let fileName = `ticketImage_${i}.jpg`;
 
-                // Tạo đường dẫn tệp
-                const filePath = path.join(imageTicketDir, fileName);
+                    // Tạo đường dẫn tệp
+                    const filePath = path.join(imageTicketDir, fileName);
 
-                let attachment = {
-                    filename: `ticketImage_${i}.jpg`,
-                    path: filePath
-                };
-                attachments.push(attachment);
+                    let attachment = {
+                        filename: `ticketImage_${i}.jpg`,
+                        path: filePath
+                    };
+                    attachments.push(attachment);
+                }
             }
+        } else {
+            let fileName = `ticketImage_5.jpg`;
+
+            // Tạo đường dẫn tệp
+            const filePath = path.join(imageTicketDir, fileName);
+
+            let attachment = {
+                filename: `ticketImage_5.jpg`,
+                path: filePath
+            };
+            attachments.push(attachment);
         }
-    } else {
-        let fileName = `ticketImage_5.jpg`;
 
-        // Tạo đường dẫn tệp
-        const filePath = path.join(imageTicketDir, fileName);
 
-        let attachment = {
-            filename: `ticketImage_5.jpg`,
-            path: filePath
-        };
-        attachments.push(attachment);
+
+        let info = await transporter.sendMail({
+            from: 'FuFu Ticket System' + '<' + process.env.EMAIL_APP + '>',
+            to: data.emailCustomer,
+            subject: "Xác Nhận Đơn Đặt Và Gửi Vé E-Ticket - FuFu's Space",
+            html: content,
+            attachments: attachments
+        });
+
+        console.log("Email sent: " + info.response);
+        return true;
+    } catch (error) {
+        // Nếu có lỗi xảy ra, log lỗi và trả về false
+        console.error("Error sending email:", error);
+        return false;
     }
-
-
-
-    let info = await transporter.sendMail({
-        from: 'FuFu Ticket System' + '<' + process.env.EMAIL_APP + '>',
-        to: data.emailCustomer,
-        subject: "Xác Nhận Đơn Đặt Và Gửi Vé E-Ticket - FuFu's Space",
-        html: content,
-        attachments: attachments
-    });
 }
 
 
 let handleMailResponsesCancle = async (data) => {
-    let transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false,
-        auth: {
-            user: process.env.EMAIL_APP,
-            pass: process.env.EMAIL_APP_PASSWORD,
-        },
-    });
+    try {
+        let transporter = nodemailer.createTransport({
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_APP,
+                pass: process.env.EMAIL_APP_PASSWORD,
+            },
+        });
 
-    let content = `
+        let content = `
     <div style="padding: 10px; background-color: #003375; font-size: 16px">
         <div style="padding: 5px; background-color: white;">
             <img style="height: 95px" src="${process.env.URL_REACT_USER}/static/media/logo_fufu.89fef136.jpg" alt="ticketImage"/>
@@ -249,15 +259,15 @@ let handleMailResponsesCancle = async (data) => {
             <p><b>- Email:</b> ${data.emailCustomer}</p>
             `;
 
-    if (data.numberAdultBest > 0) {
-        content += `<p><b>- Số lượng người lớn:</b> ${data.numberAdultBest}</p>`;
-    }
+        if (data.numberAdultBest > 0) {
+            content += `<p><b>- Số lượng người lớn:</b> ${data.numberAdultBest}</p>`;
+        }
 
-    if (data.numberKidBest > 0) {
-        content += `<p><b>- Số lượng trẻ em:</b> ${data.numberKidBest}</p>`;
-    }
+        if (data.numberKidBest > 0) {
+            content += `<p><b>- Số lượng trẻ em:</b> ${data.numberKidBest}</p>`;
+        }
 
-    content += `
+        content += `
             <p><b>- Tổng hóa đơn:<b> ${(data.bill * 1).toLocaleString('vi', { style: 'currency', currency: 'VND' })}</p>
             <p>Nếu bạn muốn đặt lại vé, hãy truy cập đường link sau để đặt lại: <a href="${process.env.URL_REACT_USER}">FuFu'Space</a></p>
             <p>Hoặc bạn có bất kỳ thắc mắc hay cần hỗ trợ thêm, đừng ngần ngại liên hệ với chúng tôi qua số điện thoại 0349601619/0901673037 hoặc email này.</p>
@@ -266,12 +276,20 @@ let handleMailResponsesCancle = async (data) => {
     </div>
 `;
 
-    let info = await transporter.sendMail({
-        from: 'FuFu Ticket System' + '<' + process.env.EMAIL_APP + '>',
-        to: data.emailCustomer,
-        subject: "Xác Nhận Đơn Đặt Và Gửi Vé E-Ticket - FuFu's Space",
-        html: content,
-    });
+        let info = await transporter.sendMail({
+            from: 'FuFu Ticket System' + '<' + process.env.EMAIL_APP + '>',
+            to: data.emailCustomer,
+            subject: "Xác Nhận Đơn Đặt Và Gửi Vé E-Ticket - FuFu's Space",
+            html: content,
+        });
+
+        console.log("Email sent: " + info.response);
+        return true;
+    } catch (error) {
+        // Nếu có lỗi xảy ra, log lỗi và trả về false
+        console.error("Error sending email:", error);
+        return false;
+    }
 }
 
 module.exports = {

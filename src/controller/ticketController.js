@@ -105,6 +105,22 @@ let handleDeleteTicket = async (req, res) => {
 }
 
 
+let handleSendThanksMail = async (req, res) => {
+    try {
+        let info = await ticketServices.sendThanksMail(req.body.arrEmail);
+        return res.status(200).json(
+            info
+        );
+    } catch (error) {
+        console.log(error);
+        return res.status(200).json({
+            errCode: -1,
+            errMessage: "Error form the server"
+        });
+    }
+}
+
+
 let handleGetDataCToChart = async (req, res) => {
     try {
         let dataChart = await ticketServices.getDataCToChart();
@@ -132,5 +148,5 @@ let handleGetDataCToChart = async (req, res) => {
 
 
 module.exports = {
-    handleGetAllTicket, handleCreateNewTicket, handleVerifyTicket, handleUpdateTicket, handleDeleteTicket, handleGetDataCToChart
+    handleGetAllTicket, handleCreateNewTicket, handleVerifyTicket, handleUpdateTicket, handleDeleteTicket, handleSendThanksMail, handleGetDataCToChart
 }

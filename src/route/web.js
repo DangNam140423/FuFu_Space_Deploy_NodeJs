@@ -72,6 +72,7 @@ const initWebRoute = (app) => {
     router.post('/api/verify-ticket', ticketController.handleVerifyTicket);
     router.put('/api/update-ticket', ticketController.handleUpdateTicket);
     router.delete('/api/delete-ticket', ticketController.handleDeleteTicket);
+    router.post('/api/send-thanks-email', ticketController.handleSendThanksMail);
     router.get('/api/get-data-chart', ticketController.handleGetDataCToChart);
 
 

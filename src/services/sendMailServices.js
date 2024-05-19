@@ -292,7 +292,105 @@ let handleMailResponsesCancle = async (data) => {
     }
 }
 
+
+let handleSendThanksMail = async (arrEmail) => {
+    try {
+        let transporter = nodemailer.createTransport({
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_APP,
+                pass: process.env.EMAIL_APP_PASSWORD,
+            },
+        });
+
+        let content = `
+        <div style="padding: 10px; font-size: 16px; text-align: justify;">
+        <div style="padding: 0 100px; background-color: white;">
+            <div style="display: flex; background-color: rgb(0, 236, 182); padding: 30px;">
+                <div style="width: 50%;">
+                    <b style="font-size: 30px;">fufu space</b>
+                    <br>
+                    <b style="font-size: 30px;">buffet pizza</b>
+                    <p>Chúng tôi xin gửi lời cảm ơn chân thành đến bạn vì đã dành thời gian đến thưởng thức bữa ăn tại Fufu Space Buffet Pizza. Đối với chúng tôi, không chỉ là việc phục vụ pizza mà còn là sự sáng tạo và thịnh vượng với vị giác của quý khách</p>
+                </div>
+                <div style="width: 50%; display: flex;">
+                    <div style="width: 70%; margin: 0 auto">
+                        <img style="width: 100%;" src="https://res.cloudinary.com/dtjdfh2ly/image/upload/v1712464584/space_4_s8znpz.jpg" alt="image_thanks">
+                        <br><br>
+                        <img style="width: 100%;" src="https://res.cloudinary.com/dtjdfh2ly/image/upload/v1712477102/space_5_ytpjyk.jpg" alt="image_thanks">
+                    </div>
+                </div>
+            </div>
+            <br>
+            <p>
+                Chúng tôi cũng muốn chia sẻ một tin vui - mỗi vé bạn đã mua
+                không chỉ tạo điều kiện làm thêm việc cho 10 sinh viên tại quán,
+                mà còn đóng góp <b>10,000 VNĐ</b> vào quỹ xây dựng "Mái ấm thú cưng",
+                nơi cưu mang các bạn chó mèo. Một phần trong số doanh thu
+                đã được trích ra và đóng góp vào quỹ <b>Chung tay quyên góp</b> để xây dựng mái ấm này.
+                Cùng nhau, chúng ta đang hướng đến một môi trường sống an toàn và yêu thương hơn
+                cho những người bạn bốn chân của chúng ta.
+            </p>
+            <p>
+                Nếu bạn quan tâm và muốn đóng góp thêm cho dự án này,
+                bạn có thể truy cập vào đường link sau để tham gia:
+                <a href="https://momo.vn/cong-dong/gop-xay-dung-mai-am-thu-cung-cuu-mang-cho-meo"> Link quyên góp</a>.
+            </p>
+            <p>
+                Hãy ghé thăm trang web đặt vé của Fufu cho những lần ghé quán tiếp theo tại:
+                <a href="${process.env.URL_REACT_USER}"> Fufu Space Booking</a>. Để được giá ưu đãi.
+            </p>
+            <p>
+                Chúng tôi mong rằng bạn đã có một trải nghiệm thú vị và đầy ý nghĩa tại
+                <b>Fufu Space Buffet Pizza</b>. Nếu có bất kỳ ý kiến hoặc góp ý nào,
+                xin vui lòng chia sẻ với chúng tôi. <b>Phản hồi của bạn</b> rất quan trọng
+                và sẽ giúp chúng tôi cải thiện dịch vụ hơn nữa.
+            </p>
+            <p>
+                Một lần nữa, xin chân thành cảm ơn và hy vọng được đón tiếp bạn sớm!
+            </p>
+            <p>
+                Trân trọng, Fufu Team <b>Fufu Space Buffet Pizza</b>
+            </p>
+            <br>
+            <div style="display: flex;">
+                <div style="width: 40%; display: flex; padding: 20px; background-color: rgb(0, 236, 182);">
+                    <div style="width: 60%;">
+                        <img style="width: 100%;" src="https://res.cloudinary.com/dtjdfh2ly/image/upload/v1715830723/logo_fufu_color_bxmepe.png" alt="image_thanks">
+                    </div>
+                </div>
+                <div style="width: 50%; padding-left: 20px">
+                    <b style="font-size: 30px;">FUFU XIN CHÀO!</b>
+                    <p>
+                        Bạn có thể theo dõi nhiều thông tin của Fufu tại:
+                        <a href="https://www.facebook.com/fufuspace/"> Facebook</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+`;
+
+        let info = await transporter.sendMail({
+            from: 'FuFu Ticket System' + '<' + process.env.EMAIL_APP + '>',
+            to: arrEmail.join(', '),
+            subject: "Cảm ơn bạn đã ghé thưởng thức bữa ăn tại Fufu Space Buffet Pizza!",
+            html: content,
+        });
+
+        return true;
+    } catch (error) {
+        // Nếu có lỗi xảy ra, log lỗi và trả về false
+        console.error("Error sending email:", error);
+        return false;
+    }
+}
+
 module.exports = {
     handleSendMailAuth, handleSendMailSystemTicket,
-    handleMailResponses, handleMailResponsesCancle
+    handleMailResponses, handleMailResponsesCancle,
+    handleSendThanksMail
 }

@@ -136,7 +136,7 @@ const checkUserPermissonJWT = (req, res, next) => {
                         '/api/get-about', '/api/edit-about',
                         '/api/get-schedule', '/api/get-schedule2', '/api/bulk-create-schedule',
                         '/api/get-all-table', '/api/create-table', '/api/update-table', '/api/delete-table', '/api/get-table-empty',
-                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket', '/api/delete-ticket',
+                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket', '/api/delete-ticket', '/api/send-thanks-email',
                         '/api/verify-ticket',
                         '/api/get-data-chart',
                         '/api/get-all-group'
@@ -151,7 +151,7 @@ const checkUserPermissonJWT = (req, res, next) => {
                         '/api/get-about', '/api/edit-about',
                         '/api/get-schedule', '/api/get-schedule2', '/api/bulk-create-schedule',
                         '/api/get-all-table', '/api/create-table', '/api/update-table', '/api/delete-table', '/api/get-table-empty',
-                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket',
+                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket', '/api/send-thanks-email',
                         '/api/verify-ticket',
                         '/api/get-data-chart',
                         '/api/get-all-group'
@@ -165,7 +165,7 @@ const checkUserPermissonJWT = (req, res, next) => {
                         '/api/get-all-group',
                         '/api/get-all-code',
                         '/api/get-all-table', '/api/get-table-empty',
-                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket',
+                        '/api/get-all-ticket', '/api/create-ticket', '/api/update-ticket', '/api/send-thanks-email',
                         '/api/get-data-chart'
                     ];
                     break;

@@ -1168,6 +1168,28 @@ let deleteTicket = (idTicket) => {
     })
 }
 
+
+let sendThanksMail = (arrEmail) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            let emailSent = await sendMailServices.handleSendThanksMail(arrEmail);
+            if (emailSent) {
+                resolve({
+                    errCode: 0,
+                    errMessage: `Send Mail Success`
+                });
+            } else {
+                resolve({
+                    errCode: 1,
+                    errMessage: `Failed to send email`
+                });
+            }
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
+
 let getDataCToChart = (inputYear) => {
     return new Promise(async (resolve, reject) => {
         try {
@@ -1240,5 +1262,5 @@ let getDataCToChart = (inputYear) => {
 }
 
 module.exports = {
-    createTicket, createTicketByCustomer, verifyTicket, verifyTicketCancle, getAllTicket, getSummaryTicket, deleteTicket, updateTicket, updateTicketOrder, getDataCToChart
+    createTicket, createTicketByCustomer, verifyTicket, verifyTicketCancle, getAllTicket, getSummaryTicket, deleteTicket, updateTicket, updateTicketOrder, sendThanksMail, getDataCToChart
 }

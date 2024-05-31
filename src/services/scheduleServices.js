@@ -96,6 +96,31 @@ let getSchedule2 = (dateInput) => {
                 return numA - numB;
             });
 
+
+            const today = new Date();
+            const dateInputString = new Date(dateInput);
+            // Nếu ngày khách mua vé là ngày HÔM NAY thì check khung giờ
+            if (today.getDate() === dateInputString.getDate() && today.getMonth() === dateInputString.getMonth() && today.getFullYear() === dateInputString.getFullYear()) {
+                dataSchedule = dataSchedule.filter((item) => {
+                    // hàm này để lấy tổng số phút từ lúc nữa đêm
+                    function timeToMinutes(timeStr) {
+                        const [hour, minute] = timeStr.split(":").map(Number);
+                        return hour * 60 + minute;
+                    }
+
+                    const time = today.getHours() + ":" + (today.getMinutes());
+                    const time1Minutes = timeToMinutes(item.allCodeData.valueEn.substring(0, 5));
+                    const time2Minutes = timeToMinutes(time.toString());
+
+                    if (time1Minutes > time2Minutes) {
+                        // Thời gian khách có thể chọn phải muộn hơn thời gian hiện tại của ngày HÔM NAY
+                        // nhớ kĩ từ HÔM NAY NHOAAA
+                        return item;
+                    }
+                });
+            }
+
+
             resolve(dataSchedule);
         } catch (error) {
             reject(error);

@@ -26,7 +26,7 @@ let handleGetSchedule = async (req, res) => {
 
 let handleGetSchedule2 = async (req, res) => {
     try {
-        let dataSchedule = await scheduleServices.getSchedule2(req.body.date);
+        let dataSchedule = await scheduleServices.getSchedule2(req.body);
         if (dataSchedule) {
             return res.status(200).json({
                 errCode: 0,

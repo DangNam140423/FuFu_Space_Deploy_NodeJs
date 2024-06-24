@@ -47,10 +47,15 @@ let handleGetAllMenu = async (req, res) => {
     }
 }
 
-let handelCreateNewDish = async (req, res) => {
+let handelCreateNewDish = async (req, res, io) => {
     try {
-        let dataDish = req.body;
-        let message = await menuServices.createNewDish(dataDish);
+        let dataToCreate = req.body;
+        let message = await menuServices.createNewDish(dataToCreate.dataDish);
+        if (message.errCode === 0) {
+            let newMenu = await menuServices.getMenuWithPagination(dataToCreate.category_pre, dataToCreate.page_pre, dataToCreate.limi_pre);
+            io.emit('newMenu', newMenu);
+        }
+
         return res.status(200).json(
             message
         )
@@ -63,10 +68,15 @@ let handelCreateNewDish = async (req, res) => {
     }
 }
 
-let handelEditDish = async (req, res) => {
+let handelEditDish = async (req, res, io) => {
     try {
-        let dataDish = req.body;
-        let message = await menuServices.editDish(dataDish);
+        let dataToEdit = req.body;
+        let message = await menuServices.editDish(dataToEdit.dataDish);
+        if (message.errCode === 0) {
+            let newMenu = await menuServices.getMenuWithPagination(dataToEdit.category_pre, dataToEdit.page_pre, dataToEdit.limi_pre);
+            io.emit('newMenu', newMenu);
+        }
+
         return res.status(200).json(
             message
         )
@@ -79,9 +89,15 @@ let handelEditDish = async (req, res) => {
     }
 }
 
-let handelDeleteDish = async (req, res) => {
+let handelDeleteDish = async (req, res, io) => {
     try {
-        let message = await menuServices.deleteDish(req.body.id);
+        let dataToDelete = req.body;
+        let message = await menuServices.deleteDish(dataToDelete.idDish);
+        if (message.errCode === 0) {
+            let newMenu = await menuServices.getMenuWithPagination(dataToDelete.category_pre, dataToDelete.page_pre, dataToDelete.limi_pre);
+            io.emit('newMenu', newMenu);
+        }
+
         return res.status(200).json(
             message
         );

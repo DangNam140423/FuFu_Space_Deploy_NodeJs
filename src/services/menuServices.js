@@ -49,12 +49,17 @@ let getMenuWithPagination = (categoryInput, page, limit) => {
                     attributes: {
                         exclude: ['image']
                     },
+                    include: [
+                        { model: db.Allcode, as: 'categoryData', attributes: ['valueEn', 'valueVi'] }
+                    ],
                     order: [
                         ['category', 'DESC'],
                         ['name', 'ASC']
                     ],
                     offset: offset,
                     limit: limit,
+                    raw: true,
+                    nest: true
                 })
                 countdataMenu = count;
                 dataMenu = rows;
@@ -64,12 +69,17 @@ let getMenuWithPagination = (categoryInput, page, limit) => {
                     attributes: {
                         exclude: ['image']
                     },
+                    include: [
+                        { model: db.Allcode, as: 'categoryData', attributes: ['valueEn', 'valueVi'] }
+                    ],
                     order: [
                         ['name', 'ASC']
                     ],
                     where: { category: categoryInput },
                     offset: offset,
                     limit: limit,
+                    raw: true,
+                    nest: true
                 })
                 countdataMenu = count;
                 dataMenu = rows;
@@ -79,7 +89,8 @@ let getMenuWithPagination = (categoryInput, page, limit) => {
             let data = {
                 totalRows: countdataMenu,
                 totalPages: totalPages,
-                dataMenu: dataMenu
+                dataMenu: dataMenu,
+                currentPage: page
             }
             resolve(data);
         } catch (error) {

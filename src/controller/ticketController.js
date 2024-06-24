@@ -1,4 +1,6 @@
 import ticketServices from '../services/ticketServices';
+import homeServices from '../services/homeServices';
+import db from '../models/index';
 
 let handleGetAllTicket = async (req, res) => {
     try {
@@ -26,7 +28,7 @@ let handleGetAllTicket = async (req, res) => {
     }
 }
 
-let handleCreateNewTicket = async (req, res) => {
+let handleCreateNewTicket = async (req, res, io) => {
     try {
         let dataTicket = req.body;
         let ticket;
@@ -34,6 +36,17 @@ let handleCreateNewTicket = async (req, res) => {
             ticket = await ticketServices.createTicketByCustomer(dataTicket);
         } else {
             ticket = await ticketServices.createTicket(dataTicket);
+        }
+        if (ticket.errCode === 0) {
+            let newTicket = await ticketServices.getAllTicket({ dataSearch: '', date: dataTicket.date });
+            let newSummaryTicket = await ticketServices.getSummaryTicket(dataTicket.date);
+            io.emit('newTicket', { newTicket, newSummaryTicket, date: dataTicket.date });
+
+            let newDataHome = await homeServices.getDataHome();
+            io.emit('newDataHome', { newDataHome });
+
+            let newDataChart = await ticketServices.getDataCToChart();
+            io.emit('newDataChart', { newDataChart });
         }
         return res.status(200).json(ticket);
     } catch (error) {
@@ -46,14 +59,39 @@ let handleCreateNewTicket = async (req, res) => {
 
 }
 
-let handleVerifyTicket = async (req, res) => {
+let handleVerifyTicket = async (req, res, io) => {
     try {
+        let ticketId = req.body.ticketId;
+        let ticketFind = await db.Ticket.findOne({
+            include: [
+                { model: db.User, as: 'staffData', attributes: ['id', 'fullName'] },
+                { model: db.Schedule, as: 'scheduleData', attributes: ['id', 'date', 'timeType'] },
+                // { model: db.Table },
+            ],
+            where: { id: ticketId },
+            raw: true,
+            nest: true
+        });
+
         let info;
         if ('cancle' in req.body) {
             info = await ticketServices.verifyTicketCancle(req.body);
         } else {
             info = await ticketServices.verifyTicket(req.body);
         }
+
+        if (info.errCode === 0) {
+            let newTicket = await ticketServices.getAllTicket({ dataSearch: '', date: ticketFind.scheduleData.date.getTime() });
+            let newSummaryTicket = await ticketServices.getSummaryTicket(ticketFind.scheduleData.date.getTime());
+            io.emit('newTicket', { newTicket, newSummaryTicket, date: ticketFind.scheduleData.date.getTime() });
+
+            let newDataHome = await homeServices.getDataHome();
+            io.emit('newDataHome', { newDataHome });
+
+            let newDataChart = await ticketServices.getDataCToChart();
+            io.emit('newDataChart', { newDataChart });
+        }
+
         return res.status(200).json(
             info
         )
@@ -66,17 +104,49 @@ let handleVerifyTicket = async (req, res) => {
     }
 }
 
-let handleUpdateTicket = async (req, res) => {
+let handleUpdateTicket = async (req, res, io) => {
     try {
         let dataTicket = req.body.dataTicket;
         let arrOrder = req.body.arrOrder;
         let message = '';
         const infoUser = req.user;
+
         if (arrOrder.length > 0) {
             message = await ticketServices.updateTicketOrder(dataTicket, arrOrder);
+
+            if (message.errCode === 0) {
+                let newTicket = await ticketServices.getAllTicket({ dataSearch: '', date: dataTicket.date });
+                let newSummaryTicket = await ticketServices.getSummaryTicket(dataTicket.date);
+                io.emit('newTicket', { newTicket, newSummaryTicket, date: dataTicket.date });
+
+                let newDataHome = await homeServices.getDataHome();
+                io.emit('newDataHome', { newDataHome });
+
+                let newDataChart = await ticketServices.getDataCToChart();
+                io.emit('newDataChart', { newDataChart });
+            }
         } else {
             message = await ticketServices.updateTicket(dataTicket, infoUser);
+
+            if (message.errCode === 0) {
+                let newTicket = await ticketServices.getAllTicket({ dataSearch: '', date: dataTicket.date });
+                let newSummaryTicket = await ticketServices.getSummaryTicket(dataTicket.date);
+
+                let newTicket_oldDate = await ticketServices.getAllTicket({ dataSearch: '', date: dataTicket.date_old });
+                let newSummaryTicket_oldDate = await ticketServices.getSummaryTicket(dataTicket.date_old);
+                io.emit('newTicket_2',
+                    { newTicket, newSummaryTicket, date: dataTicket.date },
+                    { newTicket: newTicket_oldDate, newSummaryTicket: newSummaryTicket_oldDate, date: dataTicket.date_old }
+                );
+
+                let newDataHome = await homeServices.getDataHome();
+                io.emit('newDataHome', { newDataHome });
+
+                let newDataChart = await ticketServices.getDataCToChart();
+                io.emit('newDataChart', { newDataChart });
+            }
         }
+
         return res.status(200).json(
             message
         )
@@ -89,9 +159,22 @@ let handleUpdateTicket = async (req, res) => {
     }
 }
 
-let handleDeleteTicket = async (req, res) => {
+let handleDeleteTicket = async (req, res, io) => {
     try {
         let message = await ticketServices.deleteTicket(req.body.id);
+
+        if (message.errCode === 0) {
+            let newTicket = await ticketServices.getAllTicket({ dataSearch: '', date: req.body.date });
+            let newSummaryTicket = await ticketServices.getSummaryTicket(req.body.date);
+            io.emit('newTicket', { newTicket, newSummaryTicket, date: req.body.date });
+
+            let newDataHome = await homeServices.getDataHome();
+            io.emit('newDataHome', { newDataHome });
+
+            let newDataChart = await ticketServices.getDataCToChart();
+            io.emit('newDataChart', { newDataChart });
+        }
+
         return res.status(200).json(
             message
         );

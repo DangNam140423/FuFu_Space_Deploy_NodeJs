@@ -307,7 +307,7 @@ let handleSendThanksMail = async (arrEmail) => {
 
         let content = `
         <div style="padding: 10px; font-size: 16px; text-align: justify;">
-        <div style="padding: 0 100px; background-color: white;">
+        <div style="padding: 0 10px; background-color: white;">
             <div style="display: flex; background-color: rgb(0, 236, 182); padding: 30px;">
                 <div style="width: 50%;">
                     <b style="font-size: 30px;">fufu space</b>

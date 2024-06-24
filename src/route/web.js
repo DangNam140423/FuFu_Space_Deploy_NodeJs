@@ -18,7 +18,7 @@ let router = express.Router();
 // const isAdmin = require("./middlewares")
 
 
-const initWebRoute = (app) => {
+const initWebRoute = (app, io) => {
     router.get('/', userController.handleHome);
 
 
@@ -46,9 +46,9 @@ const initWebRoute = (app) => {
 
     // router.get('/api/get-all-category-menu', menuController.handleGetAllCategoryMenu);
     router.get('/api/get-all-menu', menuController.handleGetAllMenu);
-    router.post('/api/create-new-dish', menuController.handelCreateNewDish);
-    router.put('/api/edit-dish', menuController.handelEditDish);
-    router.delete('/api/delete-dish', menuController.handelDeleteDish);
+    router.post('/api/create-new-dish', (req, res) => menuController.handelCreateNewDish(req, res, io));
+    router.put('/api/edit-dish', (req, res) => menuController.handelEditDish(req, res, io));
+    router.delete('/api/delete-dish', (req, res) => menuController.handelDeleteDish(req, res, io));
 
 
     // router.get('/api/get-about', aboutController.handleGetAbout);
@@ -57,7 +57,7 @@ const initWebRoute = (app) => {
 
     router.post('/api/get-schedule', scheduleController.handleGetSchedule);
     router.post('/api/get-schedule2', scheduleController.handleGetSchedule2);
-    router.post('/api/bulk-create-schedule', scheduleController.handleSaveNewSchedule);
+    router.post('/api/bulk-create-schedule', (req, res) => scheduleController.handleSaveNewSchedule(req, res, io));
 
 
     router.get('/api/get-all-table', tableController.handleGetAllTable);
@@ -68,10 +68,10 @@ const initWebRoute = (app) => {
 
 
     router.post('/api/get-all-ticket', ticketController.handleGetAllTicket);
-    router.post('/api/create-ticket', ticketController.handleCreateNewTicket);
-    router.post('/api/verify-ticket', ticketController.handleVerifyTicket);
-    router.put('/api/update-ticket', ticketController.handleUpdateTicket);
-    router.delete('/api/delete-ticket', ticketController.handleDeleteTicket);
+    router.post('/api/create-ticket', (req, res) => ticketController.handleCreateNewTicket(req, res, io));
+    router.post('/api/verify-ticket', (req, res) => ticketController.handleVerifyTicket(req, res, io));
+    router.put('/api/update-ticket', (req, res) => ticketController.handleUpdateTicket(req, res, io));
+    router.delete('/api/delete-ticket', (req, res) => ticketController.handleDeleteTicket(req, res, io));
     router.post('/api/send-thanks-email', ticketController.handleSendThanksMail);
     router.get('/api/get-data-chart', ticketController.handleGetDataCToChart);
 
@@ -89,7 +89,7 @@ const initWebRoute = (app) => {
 
     router.post('/api/user/get-table-empty', tableController.handleGetTableEmptyBySchedule);
 
-    router.post('/api/user/create-ticket', ticketController.handleCreateNewTicket);
+    router.post('/api/user/create-ticket', (req, res) => ticketController.handleCreateNewTicket(req, res, io));
 
     router.get('/api/user/get-top-staff-home', staffController.getTopStaffHome);
     return app.use('/', router)

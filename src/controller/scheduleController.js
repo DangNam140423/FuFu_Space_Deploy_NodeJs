@@ -47,7 +47,7 @@ let handleGetSchedule2 = async (req, res) => {
     }
 }
 
-let handleSaveNewSchedule = async (req, res) => {
+let handleSaveNewSchedule = async (req, res, io) => {
     try {
         let arrDataSchedule = req.body.arrDataSchedule;
         let numberDateToSave = req.body.numberDateToSave;
@@ -79,6 +79,8 @@ let handleSaveNewSchedule = async (req, res) => {
             arrResult.push(result);
         }
 
+        let newSchedule = "";
+
         var hasError = arrResult.filter(function (item) {
             return item.errCode !== 0;
         });
@@ -88,22 +90,25 @@ let handleSaveNewSchedule = async (req, res) => {
             hasError.map(item => {
                 errMessage = errMessage + item.errMessage + ', '
             })
-            errMessage =
-                (hasError.length === arrResult.length)
-                    ?
-                    ('Không thể lưu khung giờ vào các ngày: \n'
-                        + errMessage
-                        + '\n Vì đã có khách đặt. Hãy kiểm tra lại các ngày đó')
-                    :
-                    ('Lưu thành công, NHƯNG không thể lưu khung giờ vào các ngày: \n'
-                        + errMessage
-                        + '\n Vì đã có khách đặt. Hãy kiểm tra lại các ngày đó')
+            if (hasError.length === arrResult.length) {
+                errMessage = ('Không thể sửa khung giờ vào ngày: \n'
+                    + errMessage
+                    + '\n Vì có khung giờ mà khách đã mua vé. Hãy kiểm tra lại các ngày đó')
+            } else {
+                io.emit('newSchedule', newSchedule);
+
+                errMessage = ('Lưu thành công, NHƯNG không thể sửa khung giờ vào ngày: \n'
+                    + errMessage
+                    + '\n Vì có khung giờ mà khách đã mua vé. Hãy kiểm tra lại các ngày đó')
+            }
 
             return res.status(200).json({
                 errCode: 2,
                 errMessage: errMessage
             });
         } else {
+            io.emit('newSchedule', newSchedule);
+
             return res.status(200).json({
                 errCode: 0,
                 errMessage: 'Create new schedule succeeds !'

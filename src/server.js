@@ -3,12 +3,26 @@ import configViewEngine from './config/viewEngine';
 import initWebRoute from './route/web';
 import connectDB from './config/connectDB';
 import cookieParser from 'cookie-parser';
+import { createServer } from 'http';
+import { Server } from 'socket.io'
 // import cors from 'cors';
 
 require('dotenv').config();
 
 
-let app = express();
+const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: [
+            process.env.URL_REACT, // URL của ứng dụng React thứ nhất
+            process.env.URL_REACT_USER // URL của ứng dụng React thứ hai
+        ],
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        credentials: true
+    }
+});
+
 // app.use(cors({ origin: true }));
 // Add headers before the routes are defined
 app.use(function (req, res, next) {
@@ -60,13 +74,20 @@ app.use(cookieParser())
 
 
 //init web route
-initWebRoute(app);
+initWebRoute(app, io);
 connectDB();
+
+io.on('connection', (socket) => {
+    socket.on('disconnect', () => {
+        //
+    });
+});
+
 
 app.use((req, res) => {
     return res.send("404 not found");
 })
-app.listen(port, () => {
+server.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`)
 })
 

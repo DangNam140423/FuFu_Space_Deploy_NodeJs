@@ -12,6 +12,7 @@ import groupController from '../controller/groupController.js'
 import homeController from '../controller/homeController.js'
 
 import { checkMiddelwareUserJWT, checkUserPermissonJWT } from '../middleware/jwtAction.js'
+import uploadCloudinary from "../middleware/uploadCloudinary.js";
 
 let router = express.Router();
 
@@ -33,9 +34,9 @@ const initWebRoute = (app, io) => {
 
 
     router.get('/api/get-all-user', userController.handleGetAllUser);
-    router.post('/api/create-new-user', userController.handelCreateNewUser);
+    router.post('/api/create-new-user', uploadCloudinary.single('avatar'), userController.handelCreateNewUser);
     router.post('/api/verify-user', userController.handelVeriFyUser);
-    router.put('/api/edit-user', userController.handelEditUser);
+    router.put('/api/edit-user', uploadCloudinary.single('avatar'), userController.handelEditUser);
     router.delete('/api/delete-user', userController.handelDeleteUser);
 
 

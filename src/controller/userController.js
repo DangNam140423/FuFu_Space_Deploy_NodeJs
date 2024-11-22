@@ -1,5 +1,5 @@
 import userServices from '../services/userServices';
-import db from '../models/index';
+const cloudinary = require('cloudinary').v2;
 
 let handleLogin = async (req, res) => {
     let email = req.body.email;
@@ -100,11 +100,27 @@ let handleGetAllUser = async (req, res) => {
 }
 
 let handelCreateNewUser = async (req, res) => {
-    let dataUser = req.body;
-    let message = await userServices.createNewUser(dataUser);
-    return res.status(200).json(
-        message
-    )
+    try {
+        let dataUser = req.body;
+        dataUser.avatar = await (req.file && req.file.path) ? req.file.path : null;
+        let message = await userServices.createNewUser(dataUser);
+        if (req.file && req.file.filename && message.errCode !== 0) {
+            cloudinary.uploader.destroy(req.file.filename);
+        }
+
+        return res.status(200).json(
+            message
+        )
+    } catch (error) {
+        if (req.file && req.file.filename) {
+            cloudinary.uploader.destroy(req.file.filename);
+        }
+        console.log(error);
+        return res.status(200).json({
+            errCode: -1,
+            errMessage: "Error form the server"
+        });
+    }
 }
 
 let handelVeriFyUser = async (req, res) => {
@@ -122,11 +138,33 @@ let handelVeriFyUser = async (req, res) => {
 }
 
 let handelEditUser = async (req, res) => {
-    let user = req.body;
-    let message = await userServices.editUser(user);
-    return res.status(200).json(
-        message
-    )
+    try {
+        let user = req.body;
+        let userOld = await userServices.getAllUsers(user.id);
+        user.avatar = await (req.file && req.file.path) ? req.file.path : null;
+        let message = await userServices.editUser(user);
+
+        if (message.errCode === 0 && req.file && userOld[0].image) {
+            let url = userOld[0].image;
+            let urlArray = url.split("/");
+            let filename = urlArray[7] + "/" + urlArray[8];
+            cloudinary.uploader.destroy(filename.split(".")[0]);
+        } else if (message.errCode !== 0 && req.file && req.file.filename) {
+            cloudinary.uploader.destroy(req.file.filename);
+        }
+        return res.status(200).json(
+            message
+        )
+    } catch (error) {
+        console.log(error);
+        if (req.file && req.file.filename) {
+            cloudinary.uploader.destroy(req.file.filename);
+        }
+        return res.status(200).json({
+            errCode: -1,
+            errMessage: "Error form the server"
+        });
+    }
 }
 
 let handelDeleteUser = async (req, res) => {
@@ -134,7 +172,6 @@ let handelDeleteUser = async (req, res) => {
     return res.status(200).json(
         message
     );
-
 }
 
 let handleHome = async (req, res) => {

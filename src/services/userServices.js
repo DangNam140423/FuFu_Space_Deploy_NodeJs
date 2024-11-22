@@ -15,7 +15,7 @@ let hanleUserLogin = (email, password) => {
             let isExit = await checkUserEmail(email);
             if (isExit) {
                 let user = await db.User.findOne({
-                    where: { email: email },
+                    where: { email: email, status: true },
                     // just take email, roleId and password
                     attributes: ['id', 'email', 'roleId', 'password', 'fullName', 'status', 'image'],
                     raw: true
@@ -69,7 +69,7 @@ let checkUserEmail = (userEmail) => {
     return new Promise(async (resolve, reject) => {
         try {
             let user = await db.User.findOne({
-                where: { email: userEmail }
+                where: { email: userEmail, status: true }
             });
             if (user) {
                 resolve(true);
@@ -88,6 +88,7 @@ let getAllUsers = (userId) => {
             let users = [];
             if (userId == 'ALL') {
                 users = await db.User.findAll({
+                    where: { status: true },
                     attributes: {
                         exclude: ['password']
                     },
@@ -98,7 +99,7 @@ let getAllUsers = (userId) => {
             }
             if (userId && userId !== 'ALL') {
                 users = await db.User.findOne({
-                    where: { id: +userId }, //dấu + để convert từ kiểu string sang nố nguyên
+                    where: { id: +userId, status: true }, //dấu + để convert từ kiểu string sang nố nguyên
                     attributes: {
                         exclude: ['password'],
                     }
@@ -112,9 +113,6 @@ let getAllUsers = (userId) => {
 }
 
 
-
-
-
 let getUserWithPagination = (userId, page, limit) => {
     return new Promise(async (resolve, reject) => {
         try {
@@ -124,6 +122,7 @@ let getUserWithPagination = (userId, page, limit) => {
 
             if (userId == 'ALL') {
                 let { count, rows } = await db.User.findAndCountAll({
+                    where: { status: true },
                     attributes: {
                         exclude: ['password']
                     },
@@ -135,7 +134,7 @@ let getUserWithPagination = (userId, page, limit) => {
             }
             if (userId && userId !== 'ALL') {
                 let { count, rows } = await db.User.findAndCountAll({
-                    where: { id: +userId }, //dấu + để convert từ kiểu string sang nố nguyên
+                    where: { id: +userId, status: true }, //dấu + để convert từ kiểu string sang nố nguyên
                     attributes: {
                         exclude: ['password']
                     },
@@ -158,11 +157,6 @@ let getUserWithPagination = (userId, page, limit) => {
         }
     })
 }
-
-
-
-
-
 
 
 let hashUserPassword = (password) => {
@@ -292,7 +286,6 @@ let veriFyUser = (data) => {
     })
 }
 
-
 let deleteUser = (idUser) => {
     return new Promise(async (resolve, reject) => {
         try {
@@ -312,15 +305,23 @@ let deleteUser = (idUser) => {
                         errMessage: `The user isn't exit!`
                     })
                 } else {
-                    await db.User.destroy({
-                        where: {
-                            id: idUser
-                        }
-                    });
-                    resolve({
-                        errCode: 0,
-                        errMessage: `The user is delete`
-                    })
+                    if (user.roleId === 'R0') {
+                        resolve({
+                            errCode: 3,
+                            errMessage: `Bố mày là Boss`
+                        })
+                    } else {
+                        await db.User.update(
+                            { status: false },
+                            {
+                                where: { id: idUser, status: true },
+                            },
+                        );
+                        resolve({
+                            errCode: 0,
+                            errMessage: `The user is delete`
+                        })
+                    }
                 }
             }
 
@@ -380,8 +381,6 @@ let editUser = (dataUser) => {
         }
     })
 }
-
-
 
 module.exports = {
     hanleUserLogin, getAllUsers, getUserWithPagination, createNewUser, deleteUser, editUser, veriFyUser
